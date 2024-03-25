@@ -1,0 +1,39 @@
+{
+	"name": "@satellite/desktop-cdn",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"license": "MIT",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"dev": "DEBUG='desktop-cdn,desktop-cdn:*' node dist/test.js",
+		"build": "tsc",
+		"reset": "rm -rf data/*",
+		"format": "prettier -w ."
+	},
+	"dependencies": {
+		"blossom-client-sdk": "^0.4.0",
+		"blossom-server-sdk": "^0.2.0",
+		"cors": "^2.8.5",
+		"debug": "^4.3.4",
+		"express": "^4.19.2",
+		"express-async-handler": "^1.2.0",
+		"http-error": "^0.0.6",
+		"mime": "^4.0.1"
+	},
+	"devDependencies": {
+		"@types/debug": "^4.1.12",
+		"@types/express": "^4.17.21",
+		"@types/follow-redirects": "^1.14.4",
+		"@types/http-errors": "^2.0.4",
+		"@types/morgan": "^1.9.9",
+		"@types/node": "^20.11.30",
+		"follow-redirects": "^1.15.6",
+		"morgan": "^1.10.0",
+		"prettier": "^3.2.5",
+		"typescript": "^5.4.3"
+	}
+}
