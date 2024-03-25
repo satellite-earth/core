@@ -2,11 +2,9 @@ import express from 'express';
 import { DesktopBlobServer } from './index.js';
 import morgan from 'morgan';
 import { BlossomSQLite } from 'blossom-server-sdk/metadata/sqlite';
-import followRedirects from 'follow-redirects';
 import { logger } from './logger.js';
 import { readStreamFromURL } from './helpers.js';
-import { BlobArchiver } from './archive.js';
-const { https } = followRedirects;
+import { BlobArchiver } from './archiver.js';
 
 const now = () => Math.floor(Date.now() / 1000);
 

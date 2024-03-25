@@ -20,6 +20,10 @@ export class BlobArchiver {
 		this.pubkeys.set(pubkey, servers);
 	}
 
+	removePubkey(pubkey: string) {
+		this.pubkeys.delete(pubkey);
+	}
+
 	async sync() {
 		this.log('Starting sync');
 
