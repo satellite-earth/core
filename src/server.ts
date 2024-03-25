@@ -14,9 +14,9 @@ export class DesktopBlobServer {
 
 	static getSha256FromPath(path: string) {
 		const match = path.match(/([0-9a-f]{64})(\.[a-z]+)?/);
-		if (!match) return {};
+		if (!match) return;
 		const sha256 = match[1];
-		const ext = match[1];
+		const ext: string | undefined = match[2];
 		return { sha256, ext };
 	}
 
@@ -47,15 +47,16 @@ export class DesktopBlobServer {
 		base.head<{ sha256: string }>(
 			'/:sha256',
 			expressAsyncHandler(async (req, res, next) => {
-				const { sha256, ext } = DesktopBlobServer.getSha256FromPath(
-					req.params.sha256,
-				);
+				const { sha256, ext } =
+					DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
 				if (!sha256) return next();
 
 				if (
 					(await this.metadata.hasBlob(sha256)) &&
 					(await this.storage.hasBlob(sha256))
 				) {
+					const type = ext || (await this.metadata.getBlob(sha256)).type;
+					if (type) res.type(type);
 					res.status(200).end();
 				} else {
 					throw new httpError.NotFound('Blob not found');
@@ -66,15 +67,16 @@ export class DesktopBlobServer {
 		base.get<{ sha256: string }>(
 			'/:sha256',
 			expressAsyncHandler(async (req, res, next) => {
-				const { sha256, ext } = DesktopBlobServer.getSha256FromPath(
-					req.params.sha256,
-				);
+				const { sha256, ext } =
+					DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
 				if (!sha256) return next();
 
 				if (
 					(await this.metadata.hasBlob(sha256)) &&
 					(await this.storage.hasBlob(sha256))
 				) {
+					const type = ext || (await this.metadata.getBlob(sha256)).type;
+					if (type) res.type(type);
 					res.status(200);
 					const stream = await this.storage.readBlob(sha256);
 					stream.pipe(res);
