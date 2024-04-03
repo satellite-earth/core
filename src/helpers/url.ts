@@ -20,8 +20,3 @@ export function readStreamFromURL(url: string | URL): Promise<IncomingMessage> {
 			.end();
 	});
 }
-
-export function compressHex(pubkey: string) {
-	if (pubkey.length > 16) return pubkey.slice(0, 7);
-	return pubkey;
-}

@@ -1,5 +1,6 @@
 {
-	"name": "@satellite/desktop-cdn",
+	"name": "@satellite/core",
+	"private": true,
 	"version": "0.1.0",
 	"type": "module",
 	"main": "dist/index.js",
@@ -9,7 +10,7 @@
 		"dist"
 	],
 	"scripts": {
-		"dev": "DEBUG='desktop-cdn,desktop-cdn:*' node dist/test.js",
+		"dev": "DEBUG='core,core:*' node dist/test.js",
 		"build": "tsc",
 		"reset": "rm -rf data/*",
 		"format": "prettier -w ."

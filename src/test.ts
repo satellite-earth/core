@@ -3,7 +3,7 @@ import { DesktopBlobServer } from './index.js';
 import morgan from 'morgan';
 import { BlossomSQLite } from 'blossom-server-sdk/metadata/sqlite';
 import { logger } from './logger.js';
-import { BlobArchiver } from './archiver.js';
+import { BlobDownloader } from './blob-downloader/index.js';
 
 const app = express();
 app.use(morgan('dev'));
@@ -12,7 +12,7 @@ const metadata = new BlossomSQLite('./data/sqlite.db');
 const blobs = new DesktopBlobServer('./data', metadata);
 await blobs.setup();
 
-const archiver = new BlobArchiver(blobs.storage, metadata);
+const archiver = new BlobDownloader(blobs.storage, metadata);
 
 app.use(blobs.router);
 

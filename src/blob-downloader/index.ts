@@ -1,15 +1,20 @@
 import { BlossomClient, Signer } from 'blossom-client-sdk';
 import { IBlobMetadataStore, IBlobStorage } from 'blossom-server-sdk';
-import { compressHex, readStreamFromURL } from './helpers.js';
+import { readStreamFromURL } from '../helpers/url.js';
 import { Debugger } from 'debug';
-import { logger } from './logger.js';
+import { logger } from '../logger.js';
 import { NostrEvent } from 'nostr-tools';
 
-export class BlobArchiver {
+function compressHex(pubkey: string) {
+	if (pubkey.length > 16) return pubkey.slice(0, 7);
+	return pubkey;
+}
+
+export class BlobDownloader {
 	storage: IBlobStorage;
 	metadata: IBlobMetadataStore;
 
-	log: Debugger = logger.extend('archiver');
+	log: Debugger = logger.extend('blob-downloader');
 
 	// queue of blobs to download
 	queue: {

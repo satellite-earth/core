@@ -4,13 +4,16 @@ import { LocalStorage } from 'blossom-server-sdk/storage/local';
 import { type IBlobMetadataStore } from 'blossom-server-sdk';
 import httpError from 'http-errors';
 
-import { logger } from './logger.js';
+import { logger } from '../logger.js';
+import { Debugger } from 'debug';
 
 export class DesktopBlobServer {
 	storagePath: string = 'data';
 	metadata: IBlobMetadataStore;
 	router: Router;
 	storage: LocalStorage;
+
+	log: Debugger;
 
 	static getSha256FromPath(path: string) {
 		const match = path.match(/([0-9a-f]{64})(\.[a-z]+)?/);
@@ -25,7 +28,8 @@ export class DesktopBlobServer {
 		this.metadata = metadataStore;
 		this.storage = new LocalStorage(storagePath);
 
-		this.storage.log = logger.extend('storage');
+		this.log = logger.extend('blob-server');
+		this.storage.log = this.log.extend('storage');
 
 		this.router = Router({});
 		this.attach(this.router);

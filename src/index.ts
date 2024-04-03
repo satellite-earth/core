@@ -1,2 +1,2 @@
-export * from './server.js';
-export * from './archiver.js';
+export * from './desktop-blob-server/index.js';
+export * from './blob-downloader/index.js';
