@@ -1,11 +1,10 @@
 import { Router, ErrorRequestHandler } from 'express';
 import expressAsyncHandler from 'express-async-handler';
-import { LocalStorage } from 'blossom-server-sdk/storage/local';
-import { type IBlobMetadataStore } from 'blossom-server-sdk';
+import { type LocalStorage, type IBlobMetadataStore } from 'blossom-server-sdk';
 import httpError from 'http-errors';
+import { Debugger } from 'debug';
 
 import { logger } from '../logger.js';
-import { Debugger } from 'debug';
 
 export class DesktopBlobServer {
 	storagePath: string = 'data';
@@ -23,20 +22,15 @@ export class DesktopBlobServer {
 		return { sha256, ext };
 	}
 
-	constructor(storagePath: string, metadataStore: IBlobMetadataStore) {
-		this.storagePath = storagePath;
+	constructor(storage: LocalStorage, metadataStore: IBlobMetadataStore) {
 		this.metadata = metadataStore;
-		this.storage = new LocalStorage(storagePath);
+		this.storage = storage;
 
 		this.log = logger.extend('blob-server');
 		this.storage.log = this.log.extend('storage');
 
 		this.router = Router({});
 		this.attach(this.router);
-	}
-
-	async setup() {
-		await this.storage.setup();
 	}
 
 	attach(base: Router) {
@@ -51,14 +45,10 @@ export class DesktopBlobServer {
 		base.head<{ sha256: string }>(
 			'/:sha256',
 			expressAsyncHandler(async (req, res, next) => {
-				const { sha256, ext } =
-					DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
+				const { sha256, ext } = DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
 				if (!sha256) return next();
 
-				if (
-					(await this.metadata.hasBlob(sha256)) &&
-					(await this.storage.hasBlob(sha256))
-				) {
+				if ((await this.metadata.hasBlob(sha256)) && (await this.storage.hasBlob(sha256))) {
 					const type = ext || (await this.metadata.getBlob(sha256)).type;
 					if (type) res.type(type);
 					res.status(200).end();
@@ -71,14 +61,10 @@ export class DesktopBlobServer {
 		base.get<{ sha256: string }>(
 			'/:sha256',
 			expressAsyncHandler(async (req, res, next) => {
-				const { sha256, ext } =
-					DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
+				const { sha256, ext } = DesktopBlobServer.getSha256FromPath(req.params.sha256) || {};
 				if (!sha256) return next();
 
-				if (
-					(await this.metadata.hasBlob(sha256)) &&
-					(await this.storage.hasBlob(sha256))
-				) {
+				if ((await this.metadata.hasBlob(sha256)) && (await this.storage.hasBlob(sha256))) {
 					const type = ext || (await this.metadata.getBlob(sha256)).type;
 					if (type) res.type(type);
 					res.status(200);
@@ -91,19 +77,11 @@ export class DesktopBlobServer {
 		);
 
 		base.put('/', (req, res, next) => {
-			return next(
-				new httpError.NotImplemented(
-					'Uploads are not implemented on this server',
-				),
-			);
+			return next(new httpError.NotImplemented('Uploads are not implemented on this server'));
 		});
 
 		base.delete('/', (req, res, next) => {
-			return next(
-				new httpError.NotImplemented(
-					'Uploads are not implemented on this server',
-				),
-			);
+			return next(new httpError.NotImplemented('Uploads are not implemented on this server'));
 		});
 
 		const handleError: ErrorRequestHandler = (err, req, res, next) => {
