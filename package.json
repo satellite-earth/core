@@ -25,7 +25,8 @@
 		"express-async-handler": "^1.2.0",
 		"http-error": "^0.0.6",
 		"mime": "^4.0.1",
-		"nostr-tools": "^2.3.2"
+		"nostr-tools": "^2.3.2",
+		"ws": "^8.16.0"
 	},
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.9",
@@ -35,6 +36,7 @@
 		"@types/http-errors": "^2.0.4",
 		"@types/morgan": "^1.9.9",
 		"@types/node": "^20.11.30",
+		"@types/ws": "^8.5.10",
 		"follow-redirects": "^1.15.6",
 		"morgan": "^1.10.0",
 		"prettier": "^3.2.5",

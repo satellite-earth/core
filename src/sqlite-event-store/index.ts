@@ -1,18 +1,19 @@
 import { Database } from 'better-sqlite3';
 import { Filter, NostrEvent, kinds } from 'nostr-tools';
 import { mapParams } from '../helpers/sql.js';
+import { IEventStore } from './interface.js';
 
 const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
 };
 
-export class SQLiteEventStore {
+export class SQLiteEventStore implements IEventStore {
 	db: Database;
 	constructor(db: Database) {
 		this.db = db;
 	}
 
-	setup() {
+	async setup() {
 		this.db.transaction(() => {
 			// Create events table
 			this.db
