@@ -1,5 +1,7 @@
 import { Database } from 'better-sqlite3';
 import { Filter, NostrEvent, kinds } from 'nostr-tools';
+import EventEmitter from 'events';
+
 import { mapParams } from '../helpers/sql.js';
 import { IEventStore } from './interface.js';
 
@@ -7,9 +9,15 @@ const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
 };
 
-export class SQLiteEventStore implements IEventStore {
+type EventMap = {
+	'event:inserted': [NostrEvent];
+	'event:removed': [string];
+};
+
+export class SQLiteEventStore extends EventEmitter implements IEventStore {
 	db: Database;
 	constructor(db: Database) {
+		super();
 		this.db = db;
 	}
 
@@ -178,6 +186,8 @@ export class SQLiteEventStore implements IEventStore {
 			return _result.changes > 0;
 		})();
 
+		if (inserted) this.emit('event:inserted', event);
+
 		return inserted;
 	}
 
@@ -201,6 +211,8 @@ export class SQLiteEventStore implements IEventStore {
 				)
 				.run(id);
 		})();
+
+		if (results.changes > 0) this.emit('event:removed', id);
 
 		return results.changes > 0;
 	}
