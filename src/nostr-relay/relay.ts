@@ -7,6 +7,10 @@ import { Filter, NostrEvent, verifyEvent, matchFilters } from 'nostr-tools';
 import { IEventStore } from '../sqlite-event-store/interface.js';
 import { logger } from '../logger.js';
 
+export type IncomingReqMessage = ['REQ', string, ...Filter[]];
+export type IncomingEventMessage = ['EVENT', NostrEvent];
+export type IncomingCloseMessage = ['CLOSE', string];
+
 export type Subscription = {
 	ws: WebSocket;
 	id: string;
@@ -61,23 +65,23 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			// Parse JSON from the raw buffer
 			data = JSON.parse(typeof message === 'string' ? message : message.toString('utf-8'));
 
-			if (Array.isArray(data)) throw new Error('Message is not an array');
+			if (!Array.isArray(data)) throw new Error('Message is not an array');
 
 			// Pass the data to appropriate handler
 			switch (data[0]) {
 				// TODO handle auth
 				case 'REQ':
-					this.handleReqMessage(data, ws);
+					this.handleReqMessage(data as IncomingReqMessage, ws);
 					break;
 				case 'EVENT':
-					this.handleEventMessage(data, ws);
+					this.handleEventMessage(data as IncomingEventMessage, ws);
 					break;
 				case 'CLOSE':
-					this.handleCloseMessage(data, ws);
+					this.handleCloseMessage(data as IncomingCloseMessage, ws);
 					break;
 			}
 		} catch (err) {
-			this.log('Failed to handle message', message, err);
+			this.log('Failed to handle message', message.toString('utf-8'), err);
 		}
 
 		return data;
@@ -122,7 +126,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		}
 	}
 
-	handleEventMessage(data: ['EVENT', NostrEvent], ws: WebSocket) {
+	handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
 		// Get the event data
 		const event = data[1] as NostrEvent;
 
@@ -166,7 +170,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		sub.ws.send(JSON.stringify(['EOSE', sub.id]));
 	}
 
-	handleReqMessage(data: ['REQ', string, ...Filter[]], ws: WebSocket) {
+	handleReqMessage(data: IncomingReqMessage, ws: WebSocket) {
 		const [_, subid, ...filters] = data;
 		if (typeof subid !== 'string') return;
 
@@ -188,7 +192,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		this.runSubscription(subscription);
 	}
 
-	handleCloseMessage(data: ['CLOSE', string], ws: WebSocket) {
+	handleCloseMessage(data: IncomingCloseMessage, ws: WebSocket) {
 		if (typeof data[1] !== 'string') return;
 		const subid = data[1];
 
