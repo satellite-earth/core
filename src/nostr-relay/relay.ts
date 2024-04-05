@@ -43,6 +43,12 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		super();
 
 		this.eventStore = eventStore;
+
+		// listen for new events inserted into the store
+		this.eventStore.on('event:inserted', (event) => {
+			// make sure it wasn't the last event we inserted
+			if (event.id !== this.lastInserted) this.sendEventToSubscriptions(event);
+		});
 	}
 
 	attachToServer(wss: WebSocketServer) {
@@ -118,7 +124,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		delete this.connections[id];
 	}
 
-	protected passToSubscriptions(event: NostrEvent) {
+	sendEventToSubscriptions(event: NostrEvent) {
 		for (const sub of this.subscriptions) {
 			if (matchFilters(sub.filters, event)) {
 				sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
@@ -126,6 +132,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		}
 	}
 
+	lastInserted: string = '';
 	handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
 		// Get the event data
 		const event = data[1] as NostrEvent;
@@ -138,6 +145,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 			try {
 				// Persist to database
+				this.lastInserted = event.id;
 				inserted = this.eventStore.addEvent(event);
 			} catch (err) {
 				console.log(err);
@@ -149,7 +157,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 				this.emit('event:inserted', event, ws);
 				ws.send(JSON.stringify(['OK', event.id, true, 'accepted']));
 
-				this.passToSubscriptions(event);
+				this.sendEventToSubscriptions(event);
 			} else {
 				ws.send(JSON.stringify(['OK', event.id, true, 'duplicate']));
 			}

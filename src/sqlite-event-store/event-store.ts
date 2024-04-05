@@ -198,23 +198,9 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 
 	removeEvent(id: string) {
 		const results = this.db.transaction(() => {
-			this.db
-				.prepare(
-					`
-					DELETE FROM tags
-					WHERE e = ?
-				`,
-				)
-				.run(id);
+			this.db.prepare(`DELETE FROM tags WHERE e = ?`).run(id);
 
-			return this.db
-				.prepare(
-					`
-					DELETE FROM events
-					WHERE id = ? AND pubkey = ?
-				`,
-				)
-				.run(id);
+			return this.db.prepare(`DELETE FROM events WHERE id = ?`).run(id);
 		})();
 
 		if (results.changes > 0) this.emit('event:removed', id);
