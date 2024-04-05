@@ -208,6 +208,80 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		return results.changes > 0;
 	}
 
+	protected buildSQLQueryForFilter(
+		filter: Filter,
+		opts?: { extraJoin?: string; extraConditions?: string[]; extraParameters?: (number | string)[] },
+	) {
+		let sql = 'SELECT events.* FROM events';
+
+		const conditions: string[] = [];
+		const parameters: (string | number)[] = [];
+
+		const tagQueries = Object.keys(filter).filter((t) => {
+			return isFilterKeyIndexableTag(t);
+		});
+
+		if (tagQueries.length > 0) {
+			sql += ' INNER JOIN tags ON events.id = tags.e';
+		}
+		if (opts?.extraJoin) {
+			sql += ' ' + opts.extraJoin;
+		}
+
+		if (typeof filter.since === 'number') {
+			conditions.push(`created_at >= ?`);
+			parameters.push(filter.since);
+		}
+
+		if (typeof filter.until === 'number') {
+			conditions.push(`created_at < ?`);
+			parameters.push(filter.until);
+		}
+
+		if (filter.ids) {
+			conditions.push(`id IN ${mapParams(filter.ids)}`);
+			parameters.push(...filter.ids);
+		}
+
+		if (filter.kinds) {
+			conditions.push(`kind IN ${mapParams(filter.kinds)}`);
+			parameters.push(...filter.kinds);
+		}
+
+		if (filter.authors) {
+			conditions.push(`pubkey IN ${mapParams(filter.authors)}`);
+			parameters.push(...filter.authors);
+		}
+
+		for (let t of tagQueries) {
+			conditions.push(`tags.t = ?`);
+			parameters.push(t.slice(1));
+
+			// @ts-expect-error
+			const v = filter[t] as string[];
+			conditions.push(`tags.v IN ${mapParams(v)}`);
+			parameters.push(...v);
+		}
+
+		if (parameters.length > 0) {
+			if (opts?.extraConditions) {
+				sql += ` WHERE ${[...conditions, ...opts.extraConditions].join(' AND ')}`;
+				if (opts.extraParameters) parameters.push(...opts.extraParameters);
+			} else {
+				sql += ` WHERE ${conditions.join(' AND ')}`;
+			}
+		}
+
+		sql = sql + ' ORDER BY created_at DESC';
+
+		if (filter.limit) {
+			parameters.push(filter.limit);
+			sql += ' LIMIT ?';
+		}
+
+		return { sql, parameters };
+	}
+
 	getEventsForFilters(filters: Filter[]) {
 		type Row = {
 			id: string;
@@ -220,66 +294,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		};
 
 		const results = filters.map((filter) => {
-			let sql =
-				'SELECT events.id, events.created_at, events.pubkey, events.sig, events.kind, events.content, events.tags FROM events';
-
-			const conditions = [];
-			const parameters = [];
-
-			const tagQueries = Object.keys(filter).filter((t) => {
-				return isFilterKeyIndexableTag(t);
-			});
-
-			if (tagQueries.length > 0) {
-				sql += ' INNER JOIN tags ON events.id = tags.e';
-			}
-
-			if (typeof filter.since === 'number') {
-				conditions.push(`created_at >= ?`);
-				parameters.push(filter.since);
-			}
-
-			if (typeof filter.until === 'number') {
-				conditions.push(`created_at < ?`);
-				parameters.push(filter.until);
-			}
-
-			if (filter.ids) {
-				conditions.push(`id IN ${mapParams(filter.ids)}`);
-				parameters.push(...filter.ids);
-			}
-
-			if (filter.kinds) {
-				conditions.push(`kind IN ${mapParams(filter.kinds)}`);
-				parameters.push(...filter.kinds);
-			}
-
-			if (filter.authors) {
-				conditions.push(`pubkey IN ${mapParams(filter.authors)}`);
-				parameters.push(...filter.authors);
-			}
-
-			for (let t of tagQueries) {
-				conditions.push(`tags.t = ?`);
-				parameters.push(t.slice(1));
-
-				// @ts-expect-error
-				const v = filter[t] as string[];
-				conditions.push(`tags.v IN ${mapParams(v)}`);
-				parameters.push(...v);
-			}
-
-			if (parameters.length > 0) {
-				sql += ` WHERE ${conditions.join(' AND ')}`;
-			}
-
-			sql = sql + ' ORDER BY created_at DESC';
-
-			if (filter.limit) {
-				parameters.push(filter.limit);
-				sql += ' LIMIT ?';
-			}
-
+			const { sql, parameters } = this.buildSQLQueryForFilter(filter);
 			return this.db.prepare(sql).all(parameters) as Row[];
 		});
 
