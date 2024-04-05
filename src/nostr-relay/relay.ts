@@ -54,10 +54,6 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	attachToServer(wss: WebSocketServer) {
 		wss.on('connection', (ws, req) => {
 			this.handleConnection(ws, req);
-
-			ws.on('message', (data, isBinary) => {
-				if (data instanceof Buffer) this.handleMessage(data, ws);
-			});
 			ws.on('close', () => this.handleDisconnect(ws));
 		});
 	}
@@ -102,6 +98,11 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		} else {
 			ip = req.socket.remoteAddress;
 		}
+
+		// listen for messages
+		ws.on('message', (data, isBinary) => {
+			if (data instanceof Buffer) this.handleMessage(data, ws);
+		});
 
 		// Generate a unique ID for ws connection
 		const id = crypto.randomUUID();
