@@ -24,6 +24,8 @@ type EventMap = {
 	'subscription:created': [Subscription];
 	'subscription:updated': [Subscription];
 	'subscription:closed': [Subscription];
+	'socket:connect': [WebSocket];
+	'socket:disconnect': [WebSocket];
 };
 
 export class NostrRelay extends EventEmitter<EventMap> {
@@ -104,6 +106,8 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			if (data instanceof Buffer) this.handleMessage(data, ws);
 		});
 
+		this.emit('socket:connect', ws);
+
 		// Generate a unique ID for ws connection
 		const id = crypto.randomUUID();
 
@@ -118,11 +122,19 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		const id = this.connectionId.get(ws);
 		if (!id) return;
 
+		const openSubscriptions = this.subscriptions.filter((sub) => sub.ws === ws);
+
 		// remove all subscriptions
 		this.subscriptions = this.subscriptions.filter((sub) => sub.ws !== ws);
 
+		for (const sub of openSubscriptions) {
+			this.emit('subscription:closed', sub);
+		}
+
 		this.connectionId.delete(ws);
 		delete this.connections[id];
+
+		this.emit('socket:disconnect', ws);
 	}
 
 	sendEventToSubscriptions(event: NostrEvent) {
