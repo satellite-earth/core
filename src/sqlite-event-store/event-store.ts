@@ -91,9 +91,9 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			const _result = this.db
 				.prepare(
 					`
-				INSERT OR IGNORE INTO events (id, created_at, pubkey, sig, kind, content, tags)
-				VALUES (?, ?, ?, ?, ?, ?, ?)
-			`,
+					INSERT OR IGNORE INTO events (id, created_at, pubkey, sig, kind, content, tags)
+					VALUES (?, ?, ?, ?, ?, ?, ?)
+				`,
 				)
 				.run([
 					event.id,

@@ -21,9 +21,9 @@ type EventMap = {
 	'event:received': [NostrEvent, WebSocket];
 	'event:inserted': [NostrEvent, WebSocket];
 	'event:rejected': [NostrEvent, WebSocket];
-	'subscription:created': [Subscription];
-	'subscription:updated': [Subscription];
-	'subscription:closed': [Subscription];
+	'subscription:created': [Subscription, WebSocket];
+	'subscription:updated': [Subscription, WebSocket];
+	'subscription:closed': [Subscription, WebSocket];
 	'socket:connect': [WebSocket];
 	'socket:disconnect': [WebSocket];
 };
@@ -54,10 +54,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	}
 
 	attachToServer(wss: WebSocketServer) {
-		wss.on('connection', (ws, req) => {
-			this.handleConnection(ws, req);
-			ws.on('close', () => this.handleDisconnect(ws));
-		});
+		wss.on('connection', this.handleConnection.bind(this));
 	}
 
 	handleMessage(message: Buffer | string, ws: WebSocket) {
@@ -106,6 +103,8 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			if (data instanceof Buffer) this.handleMessage(data, ws);
 		});
 
+		ws.on('close', () => this.handleDisconnect(ws));
+
 		this.emit('socket:connect', ws);
 
 		// Generate a unique ID for ws connection
@@ -128,7 +127,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		this.subscriptions = this.subscriptions.filter((sub) => sub.ws !== ws);
 
 		for (const sub of openSubscriptions) {
-			this.emit('subscription:closed', sub);
+			this.emit('subscription:closed', sub, ws);
 		}
 
 		this.connectionId.delete(ws);
@@ -203,10 +202,10 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		if (!this.subscriptions.includes(subscription)) {
 			this.subscriptions.push(subscription);
 			this.log('Created sub', subid);
-			this.emit('subscription:created', subscription);
+			this.emit('subscription:created', subscription, ws);
 		} else {
 			this.log('Updated sub', subid);
-			this.emit('subscription:updated', subscription);
+			this.emit('subscription:updated', subscription, ws);
 		}
 
 		// Run the subscription
@@ -221,7 +220,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 		if (subscription) {
 			this.subscriptions.splice(this.subscriptions.indexOf(subscription), 1);
-			this.emit('subscription:closed', subscription);
+			this.emit('subscription:closed', subscription, ws);
 		}
 	}
 
