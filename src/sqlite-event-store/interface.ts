@@ -9,6 +9,7 @@ type EventMap = {
 export interface IEventStore extends EventEmitter<EventMap> {
 	setup(): Promise<void>;
 	addEvent(event: NostrEvent): boolean;
+	removeEvents(ids: string[]): void;
 	removeEvent(id: string): boolean;
 	getEventsForFilters(filters: Filter[]): NostrEvent[];
 }

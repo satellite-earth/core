@@ -88,7 +88,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			// TODO: Check if event is replaceable and if its newer
 			// before inserting it into the database
 
-			const _result = this.db
+			const insert = this.db
 				.prepare(
 					`
 					INSERT OR IGNORE INTO events (id, created_at, pubkey, sig, kind, content, tags)
@@ -106,7 +106,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 				]);
 
 			// If event inserted, index tags
-			if (_result.changes) {
+			if (insert.changes) {
 				for (let tag of event.tags) {
 					// add single tags into tags table
 					if (tag[0].length === 1) {
@@ -156,27 +156,11 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 								return a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at - a.created_at;
 							})
 							.slice(1)
-							.map((item) => {
-								return item.id;
-							});
+							.map((item) => item.id);
 
-						this.db
-							.prepare(
-								`
-								DELETE FROM tags
-								WHERE e IN ${mapParams(removeIds)}
-							`,
-							)
-							.run(removeIds);
+						this.log('Removed', removeIds.length, 'existing events');
 
-						this.db
-							.prepare(
-								`
-								DELETE FROM events
-								WHERE id IN ${mapParams(removeIds)}
-							`,
-							)
-							.run(removeIds);
+						this.removeEvents(removeIds);
 
 						// If the event that was just inserted was one of
 						// the events that was removed, return null so to
@@ -188,12 +172,26 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 				}
 			}
 
-			return _result.changes > 0;
+			return insert.changes > 0;
 		})();
 
 		if (inserted) this.emit('event:inserted', event);
 
 		return inserted;
+	}
+
+	removeEvents(ids: string[]) {
+		const results = this.db.transaction(() => {
+			this.db.prepare(`DELETE FROM tags WHERE e IN ${mapParams(ids)}`).run(...ids);
+
+			return this.db.prepare(`DELETE FROM events WHERE id IN ${mapParams(ids)}`).run(...ids);
+		})();
+
+		if (results.changes > 0) {
+			for (const id of ids) {
+				this.emit('event:removed', id);
+			}
+		}
 	}
 
 	removeEvent(id: string) {
