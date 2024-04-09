@@ -158,7 +158,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 							.slice(1)
 							.map((item) => item.id);
 
-						this.log('Removed', removeIds.length, 'existing events');
+						if (!removeIds.includes(event.id)) this.log('Removed', removeIds.length, 'old replaceable events');
 
 						this.removeEvents(removeIds);
 

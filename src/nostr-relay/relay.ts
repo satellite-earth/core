@@ -132,9 +132,6 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 		this.connectionId.set(ws, id);
 		this.connections[id] = ws;
-
-		// Return model of the connection
-		return { id, ip, opened: Math.floor(Date.now() / 1000) };
 	}
 
 	handleDisconnect(ws: WebSocket) {
