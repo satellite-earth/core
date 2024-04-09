@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import crypto from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 import { IncomingMessage } from 'http';
 import { type WebSocketServer, type WebSocket } from 'ws';
 import { Filter, NostrEvent, verifyEvent, matchFilters } from 'nostr-tools';
@@ -9,6 +9,7 @@ import { logger } from '../logger.js';
 
 export type IncomingReqMessage = ['REQ', string, ...Filter[]];
 export type IncomingEventMessage = ['EVENT', NostrEvent];
+export type IncomingAuthMessage = ['AUTH', NostrEvent];
 export type IncomingCloseMessage = ['CLOSE', string];
 
 export type Subscription = {
@@ -26,6 +27,7 @@ type EventMap = {
 	'subscription:closed': [Subscription, WebSocket];
 	'socket:connect': [WebSocket];
 	'socket:disconnect': [WebSocket];
+	'socket:auth': [WebSocket, NostrEvent];
 };
 
 export class NostrRelay extends EventEmitter<EventMap> {
@@ -40,6 +42,15 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	// Create a map of connections
 	// in the form <connid> : <ws>
 	connections: Record<string, WebSocket> = {};
+
+	publicURL?: string;
+	requireRelayInAuth = true;
+	sendChallenge = false;
+	auth = new Map<WebSocket, { challenge: string; response?: NostrEvent }>();
+
+	// permissions
+	checkCreateReq?: (ws: WebSocket, subscription: Subscription, auth?: NostrEvent) => string | undefined;
+	checkReadEvent?: (ws: WebSocket, event: NostrEvent, auth?: NostrEvent) => boolean;
 
 	constructor(eventStore: IEventStore) {
 		super();
@@ -77,6 +88,9 @@ export class NostrRelay extends EventEmitter<EventMap> {
 				case 'EVENT':
 					this.handleEventMessage(data as IncomingEventMessage, ws);
 					break;
+				case 'AUTH':
+					this.handleAuthMessage(data as IncomingAuthMessage, ws);
+					break;
 				case 'CLOSE':
 					this.handleCloseMessage(data as IncomingCloseMessage, ws);
 					break;
@@ -104,6 +118,12 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		});
 
 		ws.on('close', () => this.handleDisconnect(ws));
+
+		if (this.sendChallenge) {
+			const challenge = randomUUID();
+			this.auth.set(ws, { challenge });
+			ws.send(JSON.stringify(['AUTH', challenge]));
+		}
 
 		this.emit('socket:connect', ws);
 
@@ -167,25 +187,72 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			this.emit('event:received', event, ws);
 			if (inserted) {
 				this.emit('event:inserted', event, ws);
-				ws.send(JSON.stringify(['OK', event.id, true, 'accepted']));
+				this.sendOkMessage(ws, event, true, 'accepted');
 
 				this.sendEventToSubscriptions(event);
 			} else {
-				ws.send(JSON.stringify(['OK', event.id, true, 'duplicate']));
+				this.sendOkMessage(ws, event, true, 'duplicate');
 			}
 		} catch (err) {
 			if (err instanceof Error) {
 				// error occurred, send back the OK message with false
 				this.emit('event:rejected', event, ws);
-				ws.send(JSON.stringify(['OK', event.id, false, err.message]));
+				this.sendOkMessage(ws, event, false, err.message);
 			}
 		}
 	}
 
+	// response helpers
+	sendOkMessage(ws: WebSocket, event: NostrEvent, success: boolean, message?: string) {
+		ws.send(JSON.stringify(message ? ['OK', event.id, success, message] : ['OK', event.id, success]));
+	}
+	sendPublishAuthRequired(ws: WebSocket, event: NostrEvent, message: string) {
+		ws.send(JSON.stringify(['OK', event.id, false, 'auth-required: ' + message]));
+	}
+	sendReqAuthRequired(ws: WebSocket, subscription: Subscription, message: string) {
+		ws.send(JSON.stringify(['CLOSED', subscription.id, 'auth-required: ' + message]));
+	}
+
+	handleAuthMessage(data: IncomingAuthMessage, ws: WebSocket) {
+		try {
+			const event = data[1];
+			if (!verifyEvent(event)) {
+				return this.sendOkMessage(ws, event, false, 'Invalid event');
+			}
+
+			const relay = event.tags.find((t) => t[0] === 'relay')?.[1];
+			if (this.requireRelayInAuth) {
+				if (!relay) {
+					return this.sendOkMessage(ws, event, false, 'Missing relay tag');
+				}
+				if (new URL(relay).toString() !== this.publicURL) {
+					return this.sendOkMessage(ws, event, false, 'Bad relay tag');
+				}
+			}
+
+			// check challenge
+			const challenge = this.auth.get(ws)?.challenge;
+			const challengeResponse = event.tags.find((t) => t[0] === 'challenge')?.[1];
+
+			if (!challengeResponse || !challenge) {
+				return this.sendOkMessage(ws, event, false, 'Missing challenge tag');
+			}
+			if (challengeResponse !== challenge) {
+				return this.sendOkMessage(ws, event, false, 'Bad challenge');
+			}
+
+			this.auth.set(ws, { challenge, response: event });
+			this.emit('socket:auth', ws, event);
+		} catch (e) {}
+	}
+
 	protected runSubscription(sub: Subscription) {
+		const auth = this.getSocketAuth(sub.ws);
 		const events = this.eventStore.getEventsForFilters(sub.filters);
 		for (let event of events) {
-			sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
+			if (!this.checkReadEvent || this.checkReadEvent(sub.ws, event, auth)) {
+				sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
+			}
 		}
 		sub.ws.send(JSON.stringify(['EOSE', sub.id]));
 	}
@@ -198,6 +265,12 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 		// override or set the filters
 		subscription.filters = filters;
+
+		if (this.checkCreateReq) {
+			const auth = this.getSocketAuth(ws);
+			const message = this.checkCreateReq(ws, subscription, auth);
+			if (message) return this.sendReqAuthRequired(ws, subscription, message);
+		}
 
 		if (!this.subscriptions.includes(subscription)) {
 			this.subscriptions.push(subscription);
@@ -222,6 +295,10 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			this.subscriptions.splice(this.subscriptions.indexOf(subscription), 1);
 			this.emit('subscription:closed', subscription, ws);
 		}
+	}
+
+	getSocketAuth(ws: WebSocket) {
+		return this.auth.get(ws)?.response;
 	}
 
 	stop() {
