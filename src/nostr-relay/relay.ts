@@ -240,6 +240,8 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 			this.auth.set(ws, { challenge, response: event });
 			this.emit('socket:auth', ws, event);
+			this.log('Authenticated', event.pubkey);
+			this.sendOkMessage(ws, event, true, 'Authenticated');
 		} catch (e) {}
 	}
 
