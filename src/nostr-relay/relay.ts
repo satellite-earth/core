@@ -47,6 +47,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	requireRelayInAuth = true;
 	sendChallenge = false;
 	auth = new Map<WebSocket, { challenge: string; response?: NostrEvent }>();
+	checkAuth?: (ws: WebSocket, auth: NostrEvent) => boolean | string;
 
 	// permissions
 	checkCreateReq?: (ws: WebSocket, subscription: Subscription, auth?: NostrEvent) => string | undefined;
@@ -236,6 +237,12 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			}
 			if (challengeResponse !== challenge) {
 				return this.sendOkMessage(ws, event, false, 'Bad challenge');
+			}
+
+			if (this.checkAuth) {
+				const message = this.checkAuth(ws, event);
+				if (typeof message === 'string') return this.sendOkMessage(ws, event, false, message);
+				else if (message === false) return this.sendOkMessage(ws, event, false, 'Rejected auth');
 			}
 
 			this.auth.set(ws, { challenge, response: event });
