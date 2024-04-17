@@ -184,7 +184,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		const results = this.db.transaction(() => {
 			this.db.prepare(`DELETE FROM tags WHERE e IN ${mapParams(ids)}`).run(...ids);
 
-			return this.db.prepare(`DELETE FROM events WHERE id IN ${mapParams(ids)}`).run(...ids);
+			return this.db.prepare(`DELETE FROM events WHERE events.id IN ${mapParams(ids)}`).run(...ids);
 		})();
 
 		if (results.changes > 0) {
@@ -198,7 +198,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		const results = this.db.transaction(() => {
 			this.db.prepare(`DELETE FROM tags WHERE e = ?`).run(id);
 
-			return this.db.prepare(`DELETE FROM events WHERE id = ?`).run(id);
+			return this.db.prepare(`DELETE FROM events WHERE events.id = ?`).run(id);
 		})();
 
 		if (results.changes > 0) this.emit('event:removed', id);
@@ -227,27 +227,27 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		}
 
 		if (typeof filter.since === 'number') {
-			conditions.push(`created_at >= ?`);
+			conditions.push(`events.created_at >= ?`);
 			parameters.push(filter.since);
 		}
 
 		if (typeof filter.until === 'number') {
-			conditions.push(`created_at < ?`);
+			conditions.push(`events.created_at < ?`);
 			parameters.push(filter.until);
 		}
 
 		if (filter.ids) {
-			conditions.push(`id IN ${mapParams(filter.ids)}`);
+			conditions.push(`events.id IN ${mapParams(filter.ids)}`);
 			parameters.push(...filter.ids);
 		}
 
 		if (filter.kinds) {
-			conditions.push(`kind IN ${mapParams(filter.kinds)}`);
+			conditions.push(`events.kind IN ${mapParams(filter.kinds)}`);
 			parameters.push(...filter.kinds);
 		}
 
 		if (filter.authors) {
-			conditions.push(`pubkey IN ${mapParams(filter.authors)}`);
+			conditions.push(`events.pubkey IN ${mapParams(filter.authors)}`);
 			parameters.push(...filter.authors);
 		}
 
