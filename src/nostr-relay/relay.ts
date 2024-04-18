@@ -280,10 +280,8 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 		if (!this.subscriptions.includes(subscription)) {
 			this.subscriptions.push(subscription);
-			this.log('Created sub', subid);
 			this.emit('subscription:created', subscription, ws);
 		} else {
-			this.log('Updated sub', subid);
 			this.emit('subscription:updated', subscription, ws);
 		}
 
