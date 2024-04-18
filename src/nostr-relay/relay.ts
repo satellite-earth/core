@@ -308,6 +308,9 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	}
 
 	stop() {
+		for (const ws of Object.values(this.connections)) {
+			ws.close();
+		}
 		this.removeAllListeners();
 	}
 }
