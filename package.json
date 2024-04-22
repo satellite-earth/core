@@ -1,6 +1,5 @@
 {
 	"name": "@satellite/core",
-	"private": true,
 	"version": "0.1.0",
 	"type": "module",
 	"main": "dist/index.js",
@@ -8,7 +7,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/satellite-earth/core.git"
+		"url": "git+https://github.com/satellite-earth/core.git"
 	},
 	"files": [
 		"dist"
