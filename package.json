@@ -1,6 +1,6 @@
 {
 	"name": "@satellite-earth/core",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -27,6 +27,7 @@
 		"debug": "^4.3.4",
 		"express": "^4.19.2",
 		"express-async-handler": "^1.2.0",
+		"follow-redirects": "^1.15.6",
 		"http-error": "^0.0.6",
 		"mime": "^4.0.1",
 		"nostr-tools": "^2.3.2",
@@ -41,7 +42,6 @@
 		"@types/morgan": "^1.9.9",
 		"@types/node": "^20.11.30",
 		"@types/ws": "^8.5.10",
-		"follow-redirects": "^1.15.6",
 		"morgan": "^1.10.0",
 		"prettier": "^3.2.5",
 		"typescript": "^5.4.3"

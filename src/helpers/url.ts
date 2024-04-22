@@ -3,10 +3,7 @@ import { type IncomingMessage } from 'http';
 const { http, https } = followRedirects;
 
 export function readStreamFromURL(url: string | URL): Promise<IncomingMessage> {
-	const isSecure =
-		typeof url === 'string'
-			? url.startsWith('https')
-			: url.protocol === 'https:';
+	const isSecure = typeof url === 'string' ? url.startsWith('https') : url.protocol === 'https:';
 
 	return new Promise((resolve, reject) => {
 		(isSecure ? https : http)

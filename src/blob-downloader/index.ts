@@ -63,12 +63,7 @@ export class BlobDownloader {
 		if (owners) {
 			for (const owner of owners) {
 				if ((await this.metadata.hasOwner(sha256, owner)) === false) {
-					this.log(
-						'Adding owner',
-						compressHex(owner),
-						'to',
-						compressHex(sha256),
-					);
+					this.log('Adding owner', compressHex(owner), 'to', compressHex(sha256));
 					await this.metadata.addOwner(sha256, owner);
 				}
 			}
@@ -93,36 +88,26 @@ export class BlobDownloader {
 			added = true;
 		}
 
-		if (metadata.type && (!existing.type || override))
-			existing.type = metadata.type;
+		if (metadata.type && (!existing.type || override)) existing.type = metadata.type;
 
-		if (metadata.size && (!existing.size || override))
-			existing.size = metadata.size;
+		if (metadata.size && (!existing.size || override)) existing.size = metadata.size;
 
 		if (metadata.servers) {
-			if (existing.servers)
-				existing.servers = [...existing.servers, ...metadata.servers];
+			if (existing.servers) existing.servers = [...existing.servers, ...metadata.servers];
 			else existing.servers = metadata.servers;
 		}
 
 		if (metadata.owners) {
-			if (existing.owners)
-				existing.owners = [...existing.owners, ...metadata.owners];
+			if (existing.owners) existing.owners = [...existing.owners, ...metadata.owners];
 			else existing.owners = metadata.owners;
 		}
 
 		return added;
 	}
 
-	async queueBlobsFromPubkey(
-		pubkey: string,
-		servers: string[],
-		signer?: Signer,
-	) {
+	async queueBlobsFromPubkey(pubkey: string, servers: string[], signer?: Signer) {
 		this.log('Adding blobs from pubkey', compressHex(pubkey));
-		const auth = signer
-			? await BlossomClient.getListAuth(signer, 'Backup Blobs')
-			: undefined;
+		const auth = signer ? await BlossomClient.getListAuth(signer, 'Backup Blobs') : undefined;
 
 		let n = 0;
 		for (const server of servers) {
