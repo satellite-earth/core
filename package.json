@@ -11,6 +11,7 @@
 	],
 	"scripts": {
 		"dev": "DEBUG='core,core:*' node dist/test.js",
+		"test": "echo no tests",
 		"build": "tsc",
 		"reset": "rm -rf data/*",
 		"format": "prettier -w ."
