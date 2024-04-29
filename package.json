@@ -1,6 +1,6 @@
 {
 	"name": "@satellite-earth/core",
-	"version": "0.1.2",
+	"version": "0.0.0-29424-dev",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
 	],
 	"scripts": {
 		"prepack": "yarn build",
-		"dev": "DEBUG='core,core:*' node dist/test.js",
+		"dev": "node dist/test.js",
 		"test": "echo no tests",
 		"build": "tsc",
 		"reset": "rm -rf data/*",
