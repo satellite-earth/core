@@ -206,12 +206,8 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		return results.changes > 0;
 	}
 
-	protected buildSQLQueryForFilter(
-		filter: Filter,
-		opts?: { extraJoin?: string; extraConditions?: string[]; extraParameters?: (number | string)[] },
-	) {
-		let sql = 'SELECT events.* FROM events';
-
+	buildConditionsForFilters(filter: Filter) {
+		const joins: string[] = [];
 		const conditions: string[] = [];
 		const parameters: (string | number)[] = [];
 
@@ -220,10 +216,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		});
 
 		if (tagQueries.length > 0) {
-			sql += ' INNER JOIN tags ON events.id = tags.e';
-		}
-		if (opts?.extraJoin) {
-			sql += ' ' + opts.extraJoin;
+			joins.push('INNER JOIN tags ON events.id = tags.e');
 		}
 
 		if (typeof filter.since === 'number') {
@@ -261,20 +254,40 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			parameters.push(...v);
 		}
 
+		return { conditions, parameters, joins };
+	}
+
+	protected buildSQLQueryForFilters(filters: Filter[]) {
+		let sql = 'SELECT events.* FROM events ';
+
+		const orConditions: string[] = [];
+		const parameters: any[] = [];
+
+		let joins = new Set<string>();
+		for (const filter of filters) {
+			const parts = this.buildConditionsForFilters(filter);
+
+			orConditions.push(`(${parts.conditions.join(' AND ')})`);
+			parameters.push(...parts.parameters);
+
+			for (const join of parts.joins) joins.add(join);
+		}
+
+		sql += Array.from(joins).join(' ');
+
 		if (parameters.length > 0) {
-			if (opts?.extraConditions) {
-				sql += ` WHERE ${[...conditions, ...opts.extraConditions].join(' AND ')}`;
-				if (opts.extraParameters) parameters.push(...opts.extraParameters);
-			} else {
-				sql += ` WHERE ${conditions.join(' AND ')}`;
-			}
+			sql += ` WHERE ${orConditions.join(' AND ')}`;
 		}
 
 		sql = sql + ' ORDER BY created_at DESC';
 
-		if (filter.limit) {
-			parameters.push(filter.limit);
+		let minLimit = 0;
+		for (const filter of filters) {
+			if (filter.limit) minLimit = Math.min(minLimit, filter.limit);
+		}
+		if (minLimit) {
 			sql += ' LIMIT ?';
+			parameters.push(minLimit);
 		}
 
 		return { sql, parameters };
@@ -291,41 +304,40 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			sig: string;
 		};
 
-		const results = filters.map((filter) => {
-			const { sql, parameters } = this.buildSQLQueryForFilter(filter);
-			return this.db.prepare(sql).all(parameters) as Row[];
-		});
+		const { sql, parameters } = this.buildSQLQueryForFilters(filters);
+
+		const results = this.db.prepare(sql).all(parameters) as Row[];
 
 		function parseEventTags(row: Row): NostrEvent {
 			return { ...row, tags: JSON.parse(row.tags) };
 		}
 
-		// For multiple filters, results need
-		// to be merged to avoid duplicates
-		if (results.length > 1) {
-			const ids = new Set<string>();
+		return results.map(parseEventTags);
+	}
 
-			const events: NostrEvent[] = [];
+	countEventsForFilters(filters: Filter[]) {
+		let sql = 'SELECT count(events.id) as count FROM events ';
 
-			for (let result of results) {
-				for (let row of result) {
-					if (!ids.has(row.id)) {
-						events.push(parseEventTags(row));
-						ids.add(row.id);
-					}
-				}
-			}
+		const orConditions: string[] = [];
+		const parameters: any[] = [];
 
-			// Return sorted unique array of
-			// events that match any filter,
-			// sorting deterministically by
-			// created_at, falling back to id
-			return events.sort((a, b) => {
-				const deltat = b.created_at - a.created_at;
-				return deltat === 0 ? parseInt(b.id, 16) - parseInt(a.id, 16) : deltat;
-			});
+		let joins = new Set<string>();
+		for (const filter of filters) {
+			const parts = this.buildConditionsForFilters(filter);
+
+			orConditions.push(`(${parts.conditions.join(' AND ')})`);
+			parameters.push(...parts.parameters);
+
+			for (const join of parts.joins) joins.add(join);
 		}
 
-		return results[0].map(parseEventTags);
+		sql += Array.from(joins).join(' ');
+
+		if (parameters.length > 0) {
+			sql += ` WHERE ${orConditions.join(' AND ')}`;
+		}
+
+		const results = this.db.prepare(sql).get(parameters) as { count: number };
+		return results.count;
 	}
 }

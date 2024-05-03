@@ -8,11 +8,13 @@ import { IEventStore } from '../sqlite-event-store/interface.js';
 import { logger } from '../logger.js';
 
 export type IncomingReqMessage = ['REQ', string, ...Filter[]];
+export type IncomingCountMessage = ['COUNT', string, ...Filter[]];
 export type IncomingEventMessage = ['EVENT', NostrEvent];
 export type IncomingAuthMessage = ['AUTH', NostrEvent];
 export type IncomingCloseMessage = ['CLOSE', string];
 
 export type Subscription = {
+	type: 'REQ' | 'COUNT';
 	ws: WebSocket;
 	id: string;
 	filters: Filter[];
@@ -82,9 +84,9 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 			// Pass the data to appropriate handler
 			switch (data[0]) {
-				// TODO handle auth
 				case 'REQ':
-					this.handleReqMessage(data as IncomingReqMessage, ws);
+				case 'COUNT':
+					this.handleReqMessage(data as IncomingReqMessage | IncomingCountMessage, ws);
 					break;
 				case 'EVENT':
 					this.handleEventMessage(data as IncomingEventMessage, ws);
@@ -156,7 +158,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 	sendEventToSubscriptions(event: NostrEvent) {
 		for (const sub of this.subscriptions) {
-			if (matchFilters(sub.filters, event)) {
+			if (sub.type === 'REQ' && matchFilters(sub.filters, event)) {
 				sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
 			}
 		}
@@ -254,20 +256,29 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 	protected runSubscription(sub: Subscription) {
 		const auth = this.getSocketAuth(sub.ws);
-		const events = this.eventStore.getEventsForFilters(sub.filters);
-		for (let event of events) {
-			if (!this.checkReadEvent || this.checkReadEvent(sub.ws, event, auth)) {
-				sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
-			}
+
+		switch (sub.type) {
+			case 'REQ':
+				const events = this.eventStore.getEventsForFilters(sub.filters);
+				for (let event of events) {
+					if (!this.checkReadEvent || this.checkReadEvent(sub.ws, event, auth)) {
+						sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
+					}
+				}
+				sub.ws.send(JSON.stringify(['EOSE', sub.id]));
+				break;
+			case 'COUNT':
+				const count = this.eventStore.countEventsForFilters(sub.filters);
+				sub.ws.send(JSON.stringify(['COUNT', sub.id, { count }]));
+				break;
 		}
-		sub.ws.send(JSON.stringify(['EOSE', sub.id]));
 	}
 
-	handleReqMessage(data: IncomingReqMessage, ws: WebSocket) {
-		const [_, subid, ...filters] = data;
+	handleReqMessage(data: IncomingReqMessage | IncomingCountMessage, ws: WebSocket) {
+		const [type, subid, ...filters] = data;
 		if (typeof subid !== 'string') return;
 
-		let subscription = this.subscriptions.find((s) => s.id === subid) || { id: subid, ws, filters: [] };
+		let subscription = this.subscriptions.find((s) => s.id === subid) || { type, id: subid, ws, filters: [] };
 
 		// override or set the filters
 		subscription.filters = filters;
@@ -278,11 +289,14 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			if (message) return this.sendReqAuthRequired(ws, subscription, message);
 		}
 
-		if (!this.subscriptions.includes(subscription)) {
-			this.subscriptions.push(subscription);
-			this.emit('subscription:created', subscription, ws);
-		} else {
-			this.emit('subscription:updated', subscription, ws);
+		// only save the subscription if its not a count
+		if (type !== 'COUNT') {
+			if (!this.subscriptions.includes(subscription)) {
+				this.subscriptions.push(subscription);
+				this.emit('subscription:created', subscription, ws);
+			} else {
+				this.emit('subscription:updated', subscription, ws);
+			}
 		}
 
 		// Run the subscription
@@ -294,7 +308,6 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		const subid = data[1];
 
 		const subscription = this.subscriptions.find((s) => s.id === subid && s.ws === ws);
-
 		if (subscription) {
 			this.subscriptions.splice(this.subscriptions.indexOf(subscription), 1);
 			this.emit('subscription:closed', subscription, ws);
