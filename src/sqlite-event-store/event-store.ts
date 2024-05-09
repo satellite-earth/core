@@ -281,11 +281,11 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 
 		sql = sql + ' ORDER BY created_at DESC';
 
-		let minLimit = 0;
+		let minLimit = Infinity;
 		for (const filter of filters) {
 			if (filter.limit) minLimit = Math.min(minLimit, filter.limit);
 		}
-		if (minLimit) {
+		if (minLimit !== Infinity) {
 			sql += ' LIMIT ?';
 			parameters.push(minLimit);
 		}
