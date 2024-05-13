@@ -12,6 +12,16 @@
 	"files": [
 		"dist"
 	],
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./types/*": {
+			"import": "./dist/types/*",
+			"types": "./dist/types/*"
+		}
+	},
 	"scripts": {
 		"prepack": "yarn build",
 		"dev": "node dist/test.js",
