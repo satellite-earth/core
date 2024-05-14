@@ -12,11 +12,11 @@ type AuthResponse = AuthSuccessResponse | AuthInvalidResponse;
 type ConfigSubscribe = ['CONTROL', 'CONFIG', 'SUBSCRIBE'];
 type ConfigSetAction = ['CONTROL', 'CONFIG', 'SET', keyof PrivateNodeConfig, any];
 
-export type ConfigResponse = ['CONTROL', 'CONFIG', PrivateNodeConfig];
+export type ConfigResponse = ['CONTROL', 'CONFIG', 'CHANGED', PrivateNodeConfig];
 export type ConfigMessage = ConfigSubscribe | ConfigSetAction;
 
 // Database
-type DatabaseStats = {
+export type DatabaseStats = {
 	count: number;
 	size?: number;
 };
@@ -48,7 +48,7 @@ export type LogMessage = LogSubscribe | LogUnsubscribe | LogClearAction;
 export type LogResponse = LogLineResponse | LogClearResponse;
 
 // Receiver
-type ReceiverStatus = {
+export type ReceiverStatus = {
 	active: boolean;
 	relays: Record<
 		string,
@@ -58,13 +58,19 @@ type ReceiverStatus = {
 	>;
 };
 type ReceiverStatusSubscribe = ['CONTROL', 'RECEIVER', 'SUBSCRIBE'];
+type ReceiverStatusUnsubscribe = ['CONTROL', 'RECEIVER', 'UNSUBSCRIBE'];
 type ReceiverStatusStatus = ['CONTROL', 'RECEIVER', 'STATUS'];
 type ReceiverStart = ['CONTROL', 'RECEIVER', 'START'];
 type ReceiverStop = ['CONTROL', 'RECEIVER', 'STOP'];
 
 type ReceiverStatusResponse = ['CONTROL', 'RECEIVER', 'STATUS', ReceiverStatus];
 
-export type ReceiverMessage = ReceiverStatusSubscribe | ReceiverStatusStatus | ReceiverStart | ReceiverStop;
+export type ReceiverMessage =
+	| ReceiverStatusSubscribe
+	| ReceiverStatusUnsubscribe
+	| ReceiverStatusStatus
+	| ReceiverStart
+	| ReceiverStop;
 export type ReceiverResponse = ReceiverStatusResponse;
 
 // Control Api
