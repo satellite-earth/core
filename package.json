@@ -12,18 +12,28 @@
 	"files": [
 		"dist"
 	],
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./types/*": {
+			"import": "./dist/types/*",
+			"types": "./dist/types/*"
+		}
+	},
 	"scripts": {
 		"prepack": "yarn build",
-		"dev": "DEBUG='core,core:*' node dist/test.js",
+		"dev": "node dist/test.js",
 		"test": "echo no tests",
 		"build": "tsc",
 		"reset": "rm -rf data/*",
 		"format": "prettier -w ."
 	},
 	"dependencies": {
-		"better-sqlite3": "^9.4.4",
-		"blossom-client-sdk": "^0.4.0",
-		"blossom-server-sdk": "^0.2.3",
+		"better-sqlite3": "^9.6.0",
+		"blossom-client-sdk": "^0.5.1",
+		"blossom-server-sdk": "^0.3.1",
 		"cors": "^2.8.5",
 		"debug": "^4.3.4",
 		"express": "^4.19.2",
@@ -31,7 +41,7 @@
 		"follow-redirects": "^1.15.6",
 		"http-error": "^0.0.6",
 		"mime": "^4.0.1",
-		"nostr-tools": "^2.3.2",
+		"nostr-tools": "^2.5.2",
 		"ws": "^8.16.0"
 	},
 	"devDependencies": {

@@ -8,31 +8,28 @@ on:
     tags:
       - 'v*.*.*'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: yarn install
-      - run: yarn test
+env:
+  NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
+jobs:
   publish-gpr:
-    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://npm.pkg.github.com/
-      - run: yarn install
-      - run: yarn build
-      - run: yarn publish
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build
+        run: yarn build
+
+      - name: Publish
+        run: yarn publish
