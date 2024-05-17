@@ -40,6 +40,7 @@
 		"express-async-handler": "^1.2.0",
 		"follow-redirects": "^1.15.6",
 		"http-error": "^0.0.6",
+		"http-errors": "^2.0.0",
 		"mime": "^4.0.1",
 		"nostr-tools": "^2.5.2",
 		"ws": "^8.16.0"
