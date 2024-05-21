@@ -20,6 +20,13 @@ export type Subscription = {
 	filters: Filter[];
 };
 
+export type HandlerNext = () => Promise<void>;
+export type HandlerContext = { event: NostrEvent; socket: WebSocket; relay: NostrRelay };
+export type EventHandler = (
+	ctx: HandlerContext,
+	next: HandlerNext,
+) => boolean | undefined | string | void | Promise<string | boolean | undefined | void>;
+
 type EventMap = {
 	'event:received': [NostrEvent, WebSocket];
 	'event:inserted': [NostrEvent, WebSocket];
@@ -164,8 +171,30 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		}
 	}
 
-	lastInserted: string = '';
-	handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
+	/** Used to avoid infinite loop */
+	private lastInserted: string = '';
+
+	eventHandlers: EventHandler[] = [];
+	private async callEventHandler(ctx: HandlerContext, index = 0): Promise<string | boolean | undefined | void> {
+		const handler = this.eventHandlers[index];
+		if (!handler) return;
+
+		return await handler(ctx, async () => {
+			await this.callEventHandler(ctx, index + 1);
+		});
+	}
+
+	registerEventHandler(handler: EventHandler) {
+		this.eventHandlers.push(handler);
+
+		return () => this.unregisterEventHandler(handler);
+	}
+	unregisterEventHandler(handler: EventHandler) {
+		const idx = this.eventHandlers.indexOf(handler);
+		if (idx !== -1) this.eventHandlers.splice(idx, 1);
+	}
+
+	async handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
 		// Get the event data
 		const event = data[1] as NostrEvent;
 
@@ -175,23 +204,31 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			// Verify the event's signature
 			if (!verifyEvent(event)) throw new Error(`invalid: event failed to validate or verify`);
 
-			try {
-				// Persist to database
-				this.lastInserted = event.id;
-				inserted = this.eventStore.addEvent(event);
-			} catch (err) {
-				console.log(err);
-				throw new Error(`error: server error`);
-			}
+			const context: HandlerContext = { event, socket: ws, relay: this };
+			let persist = (await this.callEventHandler(context)) ?? true;
 
-			this.emit('event:received', event, ws);
-			if (inserted) {
-				this.emit('event:inserted', event, ws);
-				this.sendOkMessage(ws, event, true, 'accepted');
+			if (persist) {
+				try {
+					// Persist to database
+					this.lastInserted = event.id;
+					inserted = this.eventStore.addEvent(event);
+				} catch (err) {
+					console.log(err);
+					throw new Error(`error: server error`);
+				}
 
-				this.sendEventToSubscriptions(event);
+				this.emit('event:received', event, ws);
+				if (inserted) {
+					this.emit('event:inserted', event, ws);
+					this.sendOkMessage(ws, event, true, typeof persist === 'string' ? persist : 'Accepted');
+
+					this.sendEventToSubscriptions(event);
+				} else {
+					this.sendOkMessage(ws, event, true, typeof persist === 'string' ? persist : 'Duplicate');
+				}
 			} else {
-				this.sendOkMessage(ws, event, true, 'duplicate');
+				// reject with generic message
+				throw new Error('Rejected');
 			}
 		} catch (err) {
 			if (err instanceof Error) {
