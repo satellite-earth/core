@@ -73,6 +73,18 @@ export type ReceiverMessage =
 	| ReceiverStop;
 export type ReceiverResponse = ReceiverStatusResponse;
 
+// Direct Messages
+type DirectMessageOpenConversation = ['CONTROL', 'DM', 'OPEN', string, string];
+type DirectMessageCloseConversation = ['CONTROL', 'DM', 'CLOSE', string, string];
+
+export type DirectMessageMessage = DirectMessageOpenConversation | DirectMessageCloseConversation;
+
 // Control Api
-export type ControlMessage = AuthMessage | ConfigMessage | DatabaseMessage | LogMessage | ReceiverMessage;
+export type ControlMessage =
+	| AuthMessage
+	| ConfigMessage
+	| DatabaseMessage
+	| LogMessage
+	| ReceiverMessage
+	| DirectMessageMessage;
 export type ControlResponse = AuthResponse | ConfigResponse | DatabaseResponse | LogResponse | ReceiverResponse;

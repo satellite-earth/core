@@ -267,10 +267,12 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		for (const filter of filters) {
 			const parts = this.buildConditionsForFilters(filter);
 
-			orConditions.push(`(${parts.conditions.join(' AND ')})`);
-			parameters.push(...parts.parameters);
+			if (parts.conditions.length > 0) {
+				orConditions.push(`(${parts.conditions.join(' AND ')})`);
+				parameters.push(...parts.parameters);
 
-			for (const join of parts.joins) joins.add(join);
+				for (const join of parts.joins) joins.add(join);
+			}
 		}
 
 		sql += Array.from(joins).join(' ');
