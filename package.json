@@ -23,7 +23,7 @@
 		}
 	},
 	"scripts": {
-		"prepack": "yarn build",
+		"prepack": "pnpm build",
 		"dev": "node dist/test.js",
 		"test": "echo no tests",
 		"build": "tsc",
