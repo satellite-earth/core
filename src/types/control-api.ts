@@ -74,10 +74,18 @@ export type ReceiverMessage =
 export type ReceiverResponse = ReceiverStatusResponse;
 
 // Direct Messages
+export type DMStats = Record<string, { sent: number; received: number; lastSent?: number; lastReceived?: number }>;
 type DirectMessageOpenConversation = ['CONTROL', 'DM', 'OPEN', string, string];
 type DirectMessageCloseConversation = ['CONTROL', 'DM', 'CLOSE', string, string];
+type DirectMessageGetStats = ['CONTROL', 'DM', 'GET-STATS'];
 
-export type DirectMessageMessage = DirectMessageOpenConversation | DirectMessageCloseConversation;
+type DirectMessageStats = ['CONTROL', 'DM', 'STATS', DMStats];
+
+export type DirectMessageMessage =
+	| DirectMessageGetStats
+	| DirectMessageOpenConversation
+	| DirectMessageCloseConversation;
+export type DirectMessageResponse = DirectMessageStats;
 
 // Control Api
 export type ControlMessage =
@@ -87,4 +95,10 @@ export type ControlMessage =
 	| LogMessage
 	| ReceiverMessage
 	| DirectMessageMessage;
-export type ControlResponse = AuthResponse | ConfigResponse | DatabaseResponse | LogResponse | ReceiverResponse;
+export type ControlResponse =
+	| AuthResponse
+	| ConfigResponse
+	| DatabaseResponse
+	| LogResponse
+	| ReceiverResponse
+	| DirectMessageResponse;
