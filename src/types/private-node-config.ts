@@ -23,4 +23,8 @@ export type PrivateNodeConfig = {
 	autoListen: boolean;
 	/** @deprecated this should always be enabled */
 	logsEnabled: boolean;
+
+	// VAPID keys
+	vapidPublicKey?: string;
+	vapidPrivateKey?: string;
 };
