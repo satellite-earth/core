@@ -17,6 +17,14 @@
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
 		},
+		"./helpers/nostr": {
+			"import": "./dist/helpers/nostr/index.js",
+			"types": "./dist/helpers/nostr/index.d.ts"
+		},
+		"./helpers/nostr/*": {
+			"import": "./dist/helpers/nostr/*",
+			"types": "./dist/helpers/nostr/*"
+		},
 		"./types/*": {
 			"import": "./dist/types/*",
 			"types": "./dist/types/*"

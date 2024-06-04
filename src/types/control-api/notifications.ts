@@ -3,7 +3,6 @@ import { NostrEvent } from 'nostr-tools';
 export type WebSubscription = {
 	type: 'web';
 	deviceType: 'mobile' | 'desktop';
-	id: string;
 	endpoint: string;
 	expirationTime: PushSubscriptionJSON['expirationTime'];
 	keys: {
