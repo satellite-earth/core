@@ -1,9 +1,9 @@
 export type PrivateNodeConfig = {
 	owner?: string;
-	pubkeys: string[];
-	relays: { url: string }[];
+	// pubkeys: string[];
+	// relays: { url: string }[];
 
-	cacheLevel: 1 | 2 | 3;
+	// cacheLevel: 1 | 2 | 3;
 
 	/**
 	 * Whether the node should require NIP-42 auth to read
