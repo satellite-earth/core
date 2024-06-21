@@ -17,13 +17,25 @@
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
 		},
+		"./helpers/nostr": {
+			"import": "./dist/helpers/nostr/index.js",
+			"types": "./dist/helpers/nostr/index.d.ts"
+		},
+		"./helpers/nostr/*": {
+			"import": "./dist/helpers/nostr/*",
+			"types": "./dist/helpers/nostr/*"
+		},
 		"./types/*": {
 			"import": "./dist/types/*",
 			"types": "./dist/types/*"
+		},
+		"./types/control-api/*": {
+			"import": "./dist/types/control-api/*",
+			"types": "./dist/types/control-api/*"
 		}
 	},
 	"scripts": {
-		"prepack": "yarn build",
+		"prepack": "pnpm build",
 		"dev": "node dist/test.js",
 		"test": "echo no tests",
 		"build": "tsc",
@@ -40,6 +52,8 @@
 		"express-async-handler": "^1.2.0",
 		"follow-redirects": "^1.15.6",
 		"http-error": "^0.0.6",
+		"http-errors": "^2.0.0",
+		"lowdb": "^7.0.1",
 		"mime": "^4.0.1",
 		"nostr-tools": "^2.5.2",
 		"ws": "^8.16.0"

@@ -267,16 +267,18 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		for (const filter of filters) {
 			const parts = this.buildConditionsForFilters(filter);
 
-			orConditions.push(`(${parts.conditions.join(' AND ')})`);
-			parameters.push(...parts.parameters);
+			if (parts.conditions.length > 0) {
+				orConditions.push(`(${parts.conditions.join(' AND ')})`);
+				parameters.push(...parts.parameters);
 
-			for (const join of parts.joins) joins.add(join);
+				for (const join of parts.joins) joins.add(join);
+			}
 		}
 
 		sql += Array.from(joins).join(' ');
 
-		if (parameters.length > 0) {
-			sql += ` WHERE ${orConditions.join(' AND ')}`;
+		if (orConditions.length > 0) {
+			sql += ` WHERE ${orConditions.join(' OR ')}`;
 		}
 
 		sql = sql + ' ORDER BY created_at DESC';
@@ -333,8 +335,8 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 
 		sql += Array.from(joins).join(' ');
 
-		if (parameters.length > 0) {
-			sql += ` WHERE ${orConditions.join(' AND ')}`;
+		if (orConditions.length > 0) {
+			sql += ` WHERE ${orConditions.join(' OR ')}`;
 		}
 
 		const results = this.db.prepare(sql).get(parameters) as { count: number };

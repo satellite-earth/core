@@ -1,9 +1,9 @@
 export type PrivateNodeConfig = {
 	owner?: string;
-	pubkeys: string[];
-	relays: { url: string }[];
+	// pubkeys: string[];
+	// relays: { url: string }[];
 
-	cacheLevel: 1 | 2 | 3;
+	// cacheLevel: 1 | 2 | 3;
 
 	/**
 	 * Whether the node should require NIP-42 auth to read
@@ -23,4 +23,8 @@ export type PrivateNodeConfig = {
 	autoListen: boolean;
 	/** @deprecated this should always be enabled */
 	logsEnabled: boolean;
+
+	// VAPID keys
+	vapidPublicKey?: string;
+	vapidPrivateKey?: string;
 };

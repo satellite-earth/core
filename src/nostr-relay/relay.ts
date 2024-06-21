@@ -20,6 +20,20 @@ export type Subscription = {
 	filters: Filter[];
 };
 
+export type HandlerNext = () => Promise<void>;
+
+export type HandlerContext = { event: NostrEvent; socket: WebSocket; relay: NostrRelay };
+export type EventHandler = (
+	ctx: HandlerContext,
+	next: HandlerNext,
+) => boolean | undefined | string | void | Promise<string | boolean | undefined | void>;
+
+export type SubscriptionFilterContext = { id: string; filters: Filter[]; socket: WebSocket; relay: NostrRelay };
+export type SubscriptionFilter = (
+	ctx: SubscriptionFilterContext,
+	next: HandlerNext,
+) => boolean | undefined | void | Promise<boolean | undefined | void>;
+
 type EventMap = {
 	'event:received': [NostrEvent, WebSocket];
 	'event:inserted': [NostrEvent, WebSocket];
@@ -51,8 +65,6 @@ export class NostrRelay extends EventEmitter<EventMap> {
 	auth = new Map<WebSocket, { challenge: string; response?: NostrEvent }>();
 	checkAuth?: (ws: WebSocket, auth: NostrEvent) => boolean | string;
 
-	// permissions
-	checkCreateReq?: (ws: WebSocket, subscription: Subscription, auth?: NostrEvent) => string | undefined;
 	checkReadEvent?: (ws: WebSocket, event: NostrEvent, auth?: NostrEvent) => boolean;
 
 	constructor(eventStore: IEventStore) {
@@ -71,7 +83,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		wss.on('connection', this.handleConnection.bind(this));
 	}
 
-	handleMessage(message: Buffer | string, ws: WebSocket) {
+	async handleMessage(message: Buffer | string, ws: WebSocket) {
 		let data;
 
 		try {
@@ -86,16 +98,16 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			switch (data[0]) {
 				case 'REQ':
 				case 'COUNT':
-					this.handleReqMessage(data as IncomingReqMessage | IncomingCountMessage, ws);
+					await this.handleSubscriptionMessage(data as IncomingReqMessage | IncomingCountMessage, ws);
 					break;
 				case 'EVENT':
-					this.handleEventMessage(data as IncomingEventMessage, ws);
+					await this.handleEventMessage(data as IncomingEventMessage, ws);
 					break;
 				case 'AUTH':
-					this.handleAuthMessage(data as IncomingAuthMessage, ws);
+					await this.handleAuthMessage(data as IncomingAuthMessage, ws);
 					break;
 				case 'CLOSE':
-					this.handleCloseMessage(data as IncomingCloseMessage, ws);
+					await this.handleCloseMessage(data as IncomingCloseMessage, ws);
 					break;
 			}
 		} catch (err) {
@@ -164,8 +176,30 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		}
 	}
 
-	lastInserted: string = '';
-	handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
+	/** Used to avoid infinite loop */
+	private lastInserted: string = '';
+
+	eventHandlers: EventHandler[] = [];
+	private async callEventHandler(ctx: HandlerContext, index = 0): Promise<string | boolean | undefined | void> {
+		const handler = this.eventHandlers[index];
+		if (!handler) return;
+
+		return await handler(ctx, async () => {
+			await this.callEventHandler(ctx, index + 1);
+		});
+	}
+
+	registerEventHandler(handler: EventHandler) {
+		this.eventHandlers.push(handler);
+
+		return () => this.unregisterEventHandler(handler);
+	}
+	unregisterEventHandler(handler: EventHandler) {
+		const idx = this.eventHandlers.indexOf(handler);
+		if (idx !== -1) this.eventHandlers.splice(idx, 1);
+	}
+
+	async handleEventMessage(data: IncomingEventMessage, ws: WebSocket) {
 		// Get the event data
 		const event = data[1] as NostrEvent;
 
@@ -175,58 +209,66 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			// Verify the event's signature
 			if (!verifyEvent(event)) throw new Error(`invalid: event failed to validate or verify`);
 
-			try {
-				// Persist to database
-				this.lastInserted = event.id;
-				inserted = this.eventStore.addEvent(event);
-			} catch (err) {
-				console.log(err);
-				throw new Error(`error: server error`);
-			}
+			const context: HandlerContext = { event, socket: ws, relay: this };
+			let persist = (await this.callEventHandler(context)) ?? true;
 
-			this.emit('event:received', event, ws);
-			if (inserted) {
-				this.emit('event:inserted', event, ws);
-				this.sendOkMessage(ws, event, true, 'accepted');
+			if (persist) {
+				try {
+					// Persist to database
+					this.lastInserted = event.id;
+					inserted = this.eventStore.addEvent(event);
+				} catch (err) {
+					console.log(err);
+					throw new Error(`error: server error`);
+				}
 
-				this.sendEventToSubscriptions(event);
+				this.emit('event:received', event, ws);
+				if (inserted) {
+					this.emit('event:inserted', event, ws);
+					this.sendPublishOkMessage(ws, event, true, typeof persist === 'string' ? persist : 'Accepted');
+
+					this.sendEventToSubscriptions(event);
+				} else {
+					this.sendPublishOkMessage(ws, event, true, typeof persist === 'string' ? persist : 'Duplicate');
+				}
 			} else {
-				this.sendOkMessage(ws, event, true, 'duplicate');
+				// reject with generic message
+				throw new Error('Rejected');
 			}
 		} catch (err) {
 			if (err instanceof Error) {
 				// error occurred, send back the OK message with false
 				this.emit('event:rejected', event, ws);
-				this.sendOkMessage(ws, event, false, err.message);
+				this.sendPublishOkMessage(ws, event, false, err.message);
 			}
 		}
 	}
 
 	// response helpers
-	sendOkMessage(ws: WebSocket, event: NostrEvent, success: boolean, message?: string) {
+	makeAuthRequiredReason(reason: string) {
+		return 'auth-required: ' + reason;
+	}
+	sendPublishOkMessage(ws: WebSocket, event: NostrEvent, success: boolean, message?: string) {
 		ws.send(JSON.stringify(message ? ['OK', event.id, success, message] : ['OK', event.id, success]));
 	}
 	sendPublishAuthRequired(ws: WebSocket, event: NostrEvent, message: string) {
-		ws.send(JSON.stringify(['OK', event.id, false, 'auth-required: ' + message]));
-	}
-	sendReqAuthRequired(ws: WebSocket, subscription: Subscription, message: string) {
-		ws.send(JSON.stringify(['CLOSED', subscription.id, 'auth-required: ' + message]));
+		ws.send(JSON.stringify(['OK', event.id, false, this.makeAuthRequiredReason(message)]));
 	}
 
 	handleAuthMessage(data: IncomingAuthMessage, ws: WebSocket) {
 		try {
 			const event = data[1];
 			if (!verifyEvent(event)) {
-				return this.sendOkMessage(ws, event, false, 'Invalid event');
+				return this.sendPublishOkMessage(ws, event, false, 'Invalid event');
 			}
 
 			const relay = event.tags.find((t) => t[0] === 'relay')?.[1];
 			if (this.requireRelayInAuth) {
 				if (!relay) {
-					return this.sendOkMessage(ws, event, false, 'Missing relay tag');
+					return this.sendPublishOkMessage(ws, event, false, 'Missing relay tag');
 				}
 				if (new URL(relay).toString() !== this.publicURL) {
-					return this.sendOkMessage(ws, event, false, 'Bad relay tag');
+					return this.sendPublishOkMessage(ws, event, false, 'Bad relay tag');
 				}
 			}
 
@@ -235,22 +277,22 @@ export class NostrRelay extends EventEmitter<EventMap> {
 			const challengeResponse = event.tags.find((t) => t[0] === 'challenge')?.[1];
 
 			if (!challengeResponse || !challenge) {
-				return this.sendOkMessage(ws, event, false, 'Missing challenge tag');
+				return this.sendPublishOkMessage(ws, event, false, 'Missing challenge tag');
 			}
 			if (challengeResponse !== challenge) {
-				return this.sendOkMessage(ws, event, false, 'Bad challenge');
+				return this.sendPublishOkMessage(ws, event, false, 'Bad challenge');
 			}
 
 			if (this.checkAuth) {
 				const message = this.checkAuth(ws, event);
-				if (typeof message === 'string') return this.sendOkMessage(ws, event, false, message);
-				else if (message === false) return this.sendOkMessage(ws, event, false, 'Rejected auth');
+				if (typeof message === 'string') return this.sendPublishOkMessage(ws, event, false, message);
+				else if (message === false) return this.sendPublishOkMessage(ws, event, false, 'Rejected auth');
 			}
 
 			this.auth.set(ws, { challenge, response: event });
 			this.emit('socket:auth', ws, event);
 			this.log('Authenticated', event.pubkey);
-			this.sendOkMessage(ws, event, true, 'Authenticated');
+			this.sendPublishOkMessage(ws, event, true, 'Authenticated');
 		} catch (e) {}
 	}
 
@@ -274,44 +316,79 @@ export class NostrRelay extends EventEmitter<EventMap> {
 		}
 	}
 
-	handleReqMessage(data: IncomingReqMessage | IncomingCountMessage, ws: WebSocket) {
-		const [type, subid, ...filters] = data;
-		if (typeof subid !== 'string') return;
+	subscriptionFilters: SubscriptionFilter[] = [];
+	private async checkSubscriptionFilters(
+		ctx: SubscriptionFilterContext,
+		index = 0,
+	): Promise<boolean | undefined | void> {
+		const handler = this.subscriptionFilters[index];
+		if (!handler) return;
 
-		let subscription = this.subscriptions.find((s) => s.id === subid) || { type, id: subid, ws, filters: [] };
+		return await handler(ctx, async () => {
+			await this.checkSubscriptionFilters(ctx, index + 1);
+		});
+	}
+	registerSubscriptionFilter(filter: SubscriptionFilter) {
+		this.subscriptionFilters.push(filter);
 
-		// override or set the filters
-		subscription.filters = filters;
-
-		if (this.checkCreateReq) {
-			const auth = this.getSocketAuth(ws);
-			const message = this.checkCreateReq(ws, subscription, auth);
-			if (message) return this.sendReqAuthRequired(ws, subscription, message);
-		}
-
-		// only save the subscription if its not a count
-		if (type !== 'COUNT') {
-			if (!this.subscriptions.includes(subscription)) {
-				this.subscriptions.push(subscription);
-				this.emit('subscription:created', subscription, ws);
-			} else {
-				this.emit('subscription:updated', subscription, ws);
-			}
-		}
-
-		// Run the subscription
-		this.runSubscription(subscription);
+		return () => this.unregisterSubscriptionFilter(filter);
+	}
+	unregisterSubscriptionFilter(filter: SubscriptionFilter) {
+		const idx = this.subscriptionFilters.indexOf(filter);
+		if (idx !== -1) this.subscriptionFilters.splice(idx, 1);
 	}
 
-	handleCloseMessage(data: IncomingCloseMessage, ws: WebSocket) {
-		if (typeof data[1] !== 'string') return;
-		const subid = data[1];
+	async handleSubscriptionMessage(data: IncomingReqMessage | IncomingCountMessage, ws: WebSocket) {
+		const [type, id, ...filters] = data;
+		if (typeof id !== 'string' || filters.length === 0) return;
 
-		const subscription = this.subscriptions.find((s) => s.id === subid && s.ws === ws);
+		try {
+			const allow = (await this.checkSubscriptionFilters({ socket: ws, filters, id, relay: this })) ?? true;
+
+			if (allow === false) {
+				return this.closeSubscription(id, ws, 'Rejected');
+			}
+
+			let subscription = this.subscriptions.find((s) => s.id === id) || { type, id: id, ws, filters: [] };
+
+			// override or set the filters
+			subscription.filters = filters;
+
+			// only save the subscription if its not a count
+			if (type !== 'COUNT') {
+				if (!this.subscriptions.includes(subscription)) {
+					this.subscriptions.push(subscription);
+					this.emit('subscription:created', subscription, ws);
+				} else {
+					this.emit('subscription:updated', subscription, ws);
+				}
+			}
+
+			// Run the subscription
+			await this.runSubscription(subscription);
+		} catch (error) {
+			if (typeof error === 'string') {
+				this.closeSubscription(id, ws, error);
+			} else if (error instanceof Error) {
+				this.closeSubscription(id, ws, error.message);
+			}
+		}
+	}
+
+	closeSubscription(id: string, ws?: WebSocket, reason?: string) {
+		const subscription = this.subscriptions.find((s) => s.id === id && (ws ? s.ws === ws : true));
 		if (subscription) {
 			this.subscriptions.splice(this.subscriptions.indexOf(subscription), 1);
-			this.emit('subscription:closed', subscription, ws);
+			this.emit('subscription:closed', subscription, subscription.ws);
 		}
+
+		if (reason) (subscription?.ws || ws)?.send(JSON.stringify(['CLOSED', id, reason]));
+	}
+	handleCloseMessage(data: IncomingCloseMessage, ws: WebSocket) {
+		if (typeof data[1] !== 'string') return;
+		const id = data[1];
+
+		this.closeSubscription(id, ws);
 	}
 
 	getSocketAuth(ws: WebSocket) {
