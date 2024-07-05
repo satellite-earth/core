@@ -1,11 +1,5 @@
 export type ReceiverStatus = {
 	active: boolean;
-	relays: Record<
-		string,
-		{
-			connected: boolean;
-		}
-	>;
 };
 type ReceiverStatusSubscribe = ['CONTROL', 'RECEIVER', 'SUBSCRIBE'];
 type ReceiverStatusUnsubscribe = ['CONTROL', 'RECEIVER', 'UNSUBSCRIBE'];
