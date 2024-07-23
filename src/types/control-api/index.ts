@@ -6,6 +6,7 @@ import { LogMessage, LogResponse } from './log.js';
 import { NotificationsMessage, NotificationsResponse } from './notifications.js';
 import { ReceiverMessage, ReceiverResponse } from './receiver.js';
 import { RemoteAuthMessage, RemoteAuthResponse } from './remote-auth.js';
+import { ReportsMessage, ReportsResponse } from './reports.js';
 
 export type ControlMessage =
 	| AuthMessage
@@ -15,7 +16,8 @@ export type ControlMessage =
 	| ReceiverMessage
 	| DirectMessageMessage
 	| NotificationsMessage
-	| RemoteAuthMessage;
+	| RemoteAuthMessage
+	| ReportsMessage;
 export type ControlResponse =
 	| AuthResponse
 	| ConfigResponse
@@ -24,4 +26,5 @@ export type ControlResponse =
 	| ReceiverResponse
 	| DirectMessageResponse
 	| NotificationsResponse
-	| RemoteAuthResponse;
+	| RemoteAuthResponse
+	| ReportsResponse;
