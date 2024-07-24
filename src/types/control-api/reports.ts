@@ -1,5 +1,5 @@
 export type ReportArguments = {
-	OVERVIEW: { required: number };
+	OVERVIEW: {};
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number };
