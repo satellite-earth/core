@@ -17,6 +17,10 @@
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
 		},
+		"./helpers/*": {
+			"import": "./dist/helpers/*",
+			"types": "./dist/helpers/*"
+		},
 		"./helpers/nostr": {
 			"import": "./dist/helpers/nostr/index.js",
 			"types": "./dist/helpers/nostr/index.d.ts"

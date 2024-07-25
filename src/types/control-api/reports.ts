@@ -1,8 +1,19 @@
+import { NostrEvent } from 'nostr-tools';
+
 export type ReportArguments = {
 	OVERVIEW: {};
+	CONVERSATIONS: { pubkey: string };
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number };
+	CONVERSATIONS: {
+		pubkey: string;
+		count: number;
+		sent: number;
+		received: number;
+		lastReceived?: number;
+		lastSent?: number;
+	};
 };
 
 // client -> server
@@ -27,5 +38,11 @@ export type ReportResultMessage<T extends keyof ReportResults> = [
 export type ReportErrorMessage = ['CONTROL', 'REPORT', 'ERROR', string, string];
 
 // control api types
-export type ReportsMessage = ReportSubscribeMessage<'OVERVIEW'> | ReportCloseMessage;
-export type ReportsResponse = ReportResultMessage<'OVERVIEW'> | ReportErrorMessage;
+export type ReportsMessage =
+	| ReportSubscribeMessage<'OVERVIEW'>
+	| ReportSubscribeMessage<'CONVERSATIONS'>
+	| ReportCloseMessage;
+export type ReportsResponse =
+	| ReportResultMessage<'OVERVIEW'>
+	| ReportResultMessage<'CONVERSATIONS'>
+	| ReportErrorMessage;
