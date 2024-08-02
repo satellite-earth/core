@@ -3,6 +3,8 @@ import { NostrEvent } from 'nostr-tools';
 export type ReportArguments = {
 	OVERVIEW: {};
 	CONVERSATIONS: { pubkey: string };
+	LOGS: { service?: string };
+	SERVICES: {};
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number };
@@ -14,6 +16,8 @@ export type ReportResults = {
 		lastReceived?: number;
 		lastSent?: number;
 	};
+	LOGS: { id: string; message: string; service: string; timestamp: number };
+	SERVICES: { id: string };
 };
 
 // client -> server
