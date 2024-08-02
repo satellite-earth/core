@@ -38,6 +38,7 @@
 			"types": "./dist/types/control-api/*"
 		}
 	},
+	"packageManager": "pnpm@9.6.0",
 	"scripts": {
 		"prepack": "pnpm build",
 		"dev": "node dist/test.js",
