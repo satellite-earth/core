@@ -5,6 +5,7 @@ import EventEmitter from 'events';
 import { mapParams } from '../helpers/sql.js';
 import { IEventStore } from './interface.js';
 import { logger } from '../logger.js';
+import { MigrationSet } from '../sqlite/migrations.js';
 
 const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
@@ -15,6 +16,56 @@ type EventMap = {
 	'event:removed': [string];
 };
 
+const migrations = new MigrationSet('event-store');
+
+// Version 1
+migrations.addScript(1, async (db, log) => {
+	// Create events table
+	db.prepare(
+		`
+		CREATE TABLE IF NOT EXISTS events (
+			id TEXT(64) PRIMARY KEY,
+			created_at INTEGER,
+			pubkey TEXT(64),
+			sig TEXT(128),
+			kind INTEGER,
+			content TEXT,
+			tags TEXT
+		)
+		`,
+	).run();
+
+	log('Setup events');
+
+	// Create tags table
+	db.prepare(
+		`
+		CREATE TABLE IF NOT EXISTS tags (
+			i INTEGER PRIMARY KEY AUTOINCREMENT,
+			e TEXT(64) REFERENCES events(id),
+			t TEXT(1),
+			v TEXT
+		)
+		`,
+	).run();
+
+	log('Setup tags table');
+
+	// Create indices
+	const indices = [
+		db.prepare('CREATE INDEX IF NOT EXISTS events_created_at ON events(created_at)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS events_pubkey ON events(pubkey)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS events_kind ON events(kind)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_e ON tags(e)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_t ON tags(t)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_v ON tags(v)'),
+	];
+
+	indices.forEach((statement) => statement.run());
+
+	log(`Setup ${indices.length} indices`);
+});
+
 export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventStore {
 	db: Database;
 	log = logger.extend('sqlite-event-store');
@@ -24,53 +75,8 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		this.db = db;
 	}
 
-	async setup() {
-		this.db.transaction(() => {
-			// Create events table
-			this.db
-				.prepare(
-					`
-				CREATE TABLE IF NOT EXISTS events (
-					id TEXT(64) PRIMARY KEY,
-					created_at INTEGER,
-					pubkey TEXT(64),
-					sig TEXT(128),
-					kind INTEGER,
-					content TEXT,
-					tags TEXT
-				)
-				`,
-				)
-				.run();
-
-			// Create tags table
-			this.db
-				.prepare(
-					`
-				CREATE TABLE IF NOT EXISTS tags (
-					i INTEGER PRIMARY KEY AUTOINCREMENT,
-					e TEXT(64) REFERENCES events(id),
-					t TEXT(1),
-					v TEXT
-				)
-				`,
-				)
-				.run();
-
-			// Create indices
-			const indices = [
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_created_at ON events(created_at)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_pubkey ON events(pubkey)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_kind ON events(kind)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_e ON tags(e)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_t ON tags(t)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_v ON tags(v)'),
-			];
-
-			indices.forEach((statement) => statement.run());
-		})();
-
-		this.log('Setup tables and indices');
+	setup() {
+		return migrations.run(this.db);
 	}
 
 	addEvent(
