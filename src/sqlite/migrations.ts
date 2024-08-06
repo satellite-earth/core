@@ -19,6 +19,37 @@ class MigrationSet {
 		this.name = name;
 	}
 
+	private ensureMigrations(database: Database | undefined = this.database) {
+		if (!database) throw new Error('database required');
+
+		database
+			.prepare(
+				`
+			CREATE TABLE IF NOT EXISTS "migrations" (
+				"id"	INTEGER NOT NULL,
+				"name"	TEXT NOT NULL,
+				"version"	INTEGER NOT NULL,
+				"date"	INTEGER NOT NULL,
+				PRIMARY KEY("id" AUTOINCREMENT)
+			);
+			`,
+			)
+			.run();
+		database
+			.prepare(
+				`
+			CREATE TABLE IF NOT EXISTS "migration_logs" (
+				"id"	INTEGER NOT NULL,
+				"migration"	INTEGER NOT NULL,
+				"message"	TEXT NOT NULL,
+				FOREIGN KEY("migration") REFERENCES "migrations",
+				PRIMARY KEY("id" AUTOINCREMENT)
+			);
+			`,
+			)
+			.run();
+	}
+
 	addScript(version: number, migrate: ScriptFunction) {
 		this.scripts.push({ version, migrate });
 	}
@@ -27,7 +58,7 @@ class MigrationSet {
 		if (!database) throw new Error('database required');
 
 		// ensure migration tables are setup
-		if (this.setupMigrationTables) await migrationTables.run(database);
+		await this.ensureMigrations(database);
 
 		const prev = database
 			.prepare<[string], { name: string; version: number }>(`SELECT * FROM migrations WHERE name=?`)
@@ -64,33 +95,5 @@ class MigrationSet {
 		}
 	}
 }
-
-const migrationTables = new MigrationSet('migrations');
-migrationTables.setupMigrationTables = false;
-
-migrationTables.addScript(1, async (db) => {
-	db.prepare(
-		`
-		CREATE TABLE IF NOT EXISTS "migrations" (
-			"id"	INTEGER NOT NULL,
-			"name"	TEXT NOT NULL,
-			"version"	INTEGER NOT NULL,
-			"date"	INTEGER NOT NULL,
-			PRIMARY KEY("id" AUTOINCREMENT)
-		);
-		`,
-	).run();
-	db.prepare(
-		`
-		CREATE TABLE IF NOT EXISTS "migration_logs" (
-			"id"	INTEGER NOT NULL,
-			"migration"	INTEGER NOT NULL,
-			"message"	TEXT NOT NULL,
-			FOREIGN KEY("migration") REFERENCES "migrations",
-			PRIMARY KEY("id" AUTOINCREMENT)
-		);
-		`,
-	).run();
-});
 
 export { MigrationSet };

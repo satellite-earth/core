@@ -1,6 +1,7 @@
 import { AuthMessage, AuthResponse } from './auth.js';
 import { ConfigMessage, ConfigResponse } from './config.js';
 import { DatabaseMessage, DatabaseResponse } from './database.js';
+import { DecryptionCacheMessage, DecryptionCacheResponse } from './decryption-cache.js';
 import { DirectMessageMessage } from './direct-messages.js';
 import { LogMessage, LogResponse } from './log.js';
 import { NotificationsMessage, NotificationsResponse } from './notifications.js';
@@ -17,7 +18,8 @@ export type ControlMessage =
 	| DirectMessageMessage
 	| NotificationsMessage
 	| RemoteAuthMessage
-	| ReportsMessage;
+	| ReportsMessage
+	| DecryptionCacheMessage;
 export type ControlResponse =
 	| AuthResponse
 	| ConfigResponse
@@ -26,4 +28,5 @@ export type ControlResponse =
 	| ReceiverResponse
 	| NotificationsResponse
 	| RemoteAuthResponse
-	| ReportsResponse;
+	| ReportsResponse
+	| DecryptionCacheResponse;
