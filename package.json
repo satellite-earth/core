@@ -52,7 +52,7 @@
 		"format": "prettier -w ."
 	},
 	"dependencies": {
-		"better-sqlite3": "^9.6.0",
+		"better-sqlite3": "^11.1.2",
 		"blossom-client-sdk": "^0.9.0",
 		"blossom-server-sdk": "^0.4.0",
 		"cors": "^2.8.5",
@@ -68,7 +68,7 @@
 		"ws": "^8.16.0"
 	},
 	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.9",
+		"@types/better-sqlite3": "^7.6.11",
 		"@types/debug": "^4.1.12",
 		"@types/express": "^4.17.21",
 		"@types/follow-redirects": "^1.14.4",
