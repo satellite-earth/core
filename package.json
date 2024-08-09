@@ -21,6 +21,10 @@
 			"import": "./dist/sqlite/index.js",
 			"types": "./dist/sqlite/index.d.ts"
 		},
+		"./sqlite-event-store": {
+			"import": "./dist/sqlite-event-store/index.js",
+			"types": "./dist/sqlite-event-store/index.d.ts"
+		},
 		"./helpers/*": {
 			"import": "./dist/helpers/*",
 			"types": "./dist/helpers/*"

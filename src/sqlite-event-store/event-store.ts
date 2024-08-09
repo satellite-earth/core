@@ -11,7 +11,7 @@ const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
 };
 
-type EventRow = {
+export type EventRow = {
 	id: string;
 	kind: number;
 	pubkey: string;
@@ -21,7 +21,7 @@ type EventRow = {
 	sig: string;
 };
 
-function parseEventRow(row: EventRow): NostrEvent {
+export function parseEventRow(row: EventRow): NostrEvent {
 	return { ...row, tags: JSON.parse(row.tags) };
 }
 
@@ -387,7 +387,9 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			sql += ` WHERE ${orConditions.join(' OR ')}`;
 		}
 
-		if (filters.some((f) => f.search)) {
+		// @ts-expect-error
+		const order = filters.find((f) => f.order)?.order;
+		if (filters.some((f) => f.search) && (order === 'rank' || order === undefined)) {
 			sql = sql + ' ORDER BY rank';
 		} else {
 			sql = sql + ' ORDER BY created_at DESC';
