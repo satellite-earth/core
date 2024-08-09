@@ -12,5 +12,6 @@ export interface IEventStore extends EventEmitter<EventMap> {
 	removeEvents(ids: string[]): void;
 	removeEvent(id: string): boolean;
 	getEventsForFilters(filters: Filter[]): NostrEvent[];
+	iterateEventsForFilters(filters: Filter[]): IterableIterator<NostrEvent>;
 	countEventsForFilters(filters: Filter[]): number;
 }
