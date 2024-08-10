@@ -65,7 +65,7 @@ class MigrationSet {
 			.all(this.name);
 		const lastVersion = prev.reduce((v, m) => Math.max(m.version, v), 0);
 
-		const sorted = Array.from(this.scripts).sort((a, b) => b.version - a.version);
+		const sorted = Array.from(this.scripts).sort((a, b) => a.version - b.version);
 
 		let version = lastVersion;
 		for (const script of sorted) {
