@@ -7,6 +7,7 @@ import { NotificationsMessage, NotificationsResponse } from './notifications.js'
 import { ReceiverMessage, ReceiverResponse } from './receiver.js';
 import { RemoteAuthMessage, RemoteAuthResponse } from './remote-auth.js';
 import { ReportsMessage, ReportsResponse } from './reports.js';
+import { LogsMessage } from './logs.js';
 
 export type ControlMessage =
 	| AuthMessage
@@ -17,7 +18,8 @@ export type ControlMessage =
 	| NotificationsMessage
 	| RemoteAuthMessage
 	| ReportsMessage
-	| DecryptionCacheMessage;
+	| DecryptionCacheMessage
+	| LogsMessage;
 export type ControlResponse =
 	| AuthResponse
 	| ConfigResponse
