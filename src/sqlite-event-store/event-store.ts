@@ -322,7 +322,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			joins.push('INNER JOIN events_fts ON events_fts.id = events.id');
 
 			conditions.push(`events_fts MATCH ?`);
-			parameters.push(filter.search);
+			parameters.push('"' + filter.search.replace(/"/g, '""') + '"');
 		}
 
 		if (typeof filter.since === 'number') {
