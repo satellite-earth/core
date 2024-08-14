@@ -8,7 +8,7 @@ export type ReportArguments = {
 	DM_SEARCH: { query: string; conversation?: [string, string]; order?: 'rank' | 'created_at' };
 };
 export type ReportResults = {
-	OVERVIEW: { pubkey: string; events: number };
+	OVERVIEW: { pubkey: string; events: number; active: number };
 	CONVERSATIONS: {
 		pubkey: string;
 		count: number;
@@ -19,7 +19,7 @@ export type ReportResults = {
 	};
 	LOGS: { id: string; message: string; service: string; timestamp: number };
 	SERVICES: { id: string };
-	DM_SEARCH: { event: NostrEvent, plaintext: string, };
+	DM_SEARCH: { event: NostrEvent; plaintext: string };
 };
 
 // client -> server
