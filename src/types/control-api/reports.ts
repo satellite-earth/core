@@ -6,7 +6,8 @@ export type ReportArguments = {
 	LOGS: { service?: string };
 	SERVICES: {};
 	DM_SEARCH: { query: string; conversation?: [string, string]; order?: 'rank' | 'created_at' };
-	SCRAPPER_OVERVIEW: {};
+	SCRAPPER_STATUS: {};
+	RECEIVER_STATUS: {};
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number; active: number };
@@ -21,7 +22,12 @@ export type ReportResults = {
 	LOGS: { id: string; message: string; service: string; timestamp: number };
 	SERVICES: { id: string };
 	DM_SEARCH: { event: NostrEvent; plaintext: string };
-	SCRAPPER_OVERVIEW: { eventsPerSecond: number; activeSubscriptions: number; pubkeys: number };
+	SCRAPPER_STATUS: { running: boolean; eventsPerSecond: number; activeSubscriptions: number; pubkeys: number };
+	RECEIVER_STATUS: {
+		status: 'starting' | 'running' | 'stopped' | 'errored';
+		startError?: string;
+		subscriptions: { relay: string; pubkeys: string[]; closed: boolean }[];
+	};
 };
 
 // client -> server

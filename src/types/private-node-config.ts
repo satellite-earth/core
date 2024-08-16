@@ -19,6 +19,9 @@ export type PrivateNodeConfig = {
 	/** @deprecated this should always be enabled */
 	logsEnabled: boolean;
 
+	runScrapperOnBoot: boolean;
+	runReceiverOnBoot: boolean;
+
 	// VAPID keys
 	vapidPublicKey?: string;
 	vapidPrivateKey?: string;
