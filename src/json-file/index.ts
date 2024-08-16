@@ -3,16 +3,6 @@ import { Adapter, Low, LowSync, SyncAdapter } from 'lowdb';
 
 import { PrivateNodeConfig } from '@satellite-earth/core/types/private-node-config.js';
 
-export const defaultConfig: PrivateNodeConfig = {
-	//pubkeys: [],
-	//relays: [],
-	//cacheLevel: 2,
-	autoListen: false,
-	logsEnabled: true,
-	requireReadAuth: false,
-	publicAddresses: [],
-};
-
 type EventMap<T> = {
 	/** fires when file is loaded */
 	loaded: [T];
