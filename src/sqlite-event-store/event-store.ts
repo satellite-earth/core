@@ -5,10 +5,144 @@ import EventEmitter from 'events';
 import { mapParams } from '../helpers/sql.js';
 import { IEventStore } from './interface.js';
 import { logger } from '../logger.js';
+import { MigrationSet } from '../sqlite/migrations.js';
 
 const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
 };
+
+export type EventRow = {
+	id: string;
+	kind: number;
+	pubkey: string;
+	content: string;
+	tags: string;
+	created_at: number;
+	sig: string;
+};
+
+export function parseEventRow(row: EventRow): NostrEvent {
+	return { ...row, tags: JSON.parse(row.tags) };
+}
+
+// search behavior
+const SEARCHABLE_TAGS = ['title', 'description', 'about', 'summary', 'alt'];
+const SEARCHABLE_KIND_BLACKLIST = [kinds.EncryptedDirectMessage];
+const SEARCHABLE_CONTENT_FORMATTERS: Record<number, (content: string) => string> = {
+	[kinds.Metadata]: (content) => {
+		const SEARCHABLE_PROFILE_FIELDS = [
+			'name',
+			'display_name',
+			'about',
+			'nip05',
+			'lud16',
+			'website',
+			// Deprecated fields
+			'displayName',
+			'username',
+		];
+		try {
+			const lines: string[] = [];
+			const json = JSON.parse(content);
+
+			for (const field of SEARCHABLE_PROFILE_FIELDS) {
+				if (json[field]) lines.push(json[field]);
+			}
+
+			return lines.join('\n');
+		} catch (error) {
+			return content;
+		}
+	},
+};
+
+function convertEventToSearchRow(event: NostrEvent) {
+	const tags = event.tags
+		.filter((t) => SEARCHABLE_TAGS.includes(t[0]))
+		.map((t) => t[1])
+		.join(' ');
+
+	const content = SEARCHABLE_CONTENT_FORMATTERS[event.kind]
+		? SEARCHABLE_CONTENT_FORMATTERS[event.kind](event.content)
+		: event.content;
+
+	return { id: event.id, content, tags };
+}
+
+const migrations = new MigrationSet('event-store');
+
+// Version 1
+migrations.addScript(1, async (db, log) => {
+	// Create events table
+	db.prepare(
+		`
+		CREATE TABLE IF NOT EXISTS events (
+			id TEXT(64) PRIMARY KEY,
+			created_at INTEGER,
+			pubkey TEXT(64),
+			sig TEXT(128),
+			kind INTEGER,
+			content TEXT,
+			tags TEXT
+		)
+		`,
+	).run();
+
+	log('Setup events');
+
+	// Create tags table
+	db.prepare(
+		`
+		CREATE TABLE IF NOT EXISTS tags (
+			i INTEGER PRIMARY KEY AUTOINCREMENT,
+			e TEXT(64) REFERENCES events(id),
+			t TEXT(1),
+			v TEXT
+		)
+		`,
+	).run();
+
+	log('Setup tags table');
+
+	// Create indices
+	const indices = [
+		db.prepare('CREATE INDEX IF NOT EXISTS events_created_at ON events(created_at)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS events_pubkey ON events(pubkey)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS events_kind ON events(kind)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_e ON tags(e)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_t ON tags(t)'),
+		db.prepare('CREATE INDEX IF NOT EXISTS tags_v ON tags(v)'),
+	];
+
+	indices.forEach((statement) => statement.run());
+
+	log(`Setup ${indices.length} indices`);
+});
+
+// Version 2, search table
+migrations.addScript(2, async (db, log) => {
+	db.prepare(
+		`CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(id UNINDEXED, content, tags, tokenize='trigram')`,
+	).run();
+	log('Created event search table');
+
+	const rows = db
+		.prepare<any[], EventRow>(`SELECT * FROM events WHERE kind NOT IN ${mapParams(SEARCHABLE_KIND_BLACKLIST)}`)
+		.all(SEARCHABLE_KIND_BLACKLIST);
+
+	// insert search content into table
+	let changes = 0;
+	for (const row of rows) {
+		const search = convertEventToSearchRow(parseEventRow(row));
+
+		const result = db
+			.prepare<[string, string, string]>(`INSERT OR REPLACE INTO events_fts (id, content, tags) VALUES (?, ?, ?)`)
+			.run(search.id, search.content, search.tags);
+
+		changes += result.changes;
+	}
+	log(`Inserted ${changes} events into search table`);
+});
 
 type EventMap = {
 	'event:inserted': [NostrEvent];
@@ -19,70 +153,22 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 	db: Database;
 	log = logger.extend('sqlite-event-store');
 
+	preserveEphemeral = false;
+	preserveReplaceable = false;
+
 	constructor(db: Database) {
 		super();
 		this.db = db;
 	}
 
-	async setup() {
-		this.db.transaction(() => {
-			// Create events table
-			this.db
-				.prepare(
-					`
-				CREATE TABLE IF NOT EXISTS events (
-					id TEXT(64) PRIMARY KEY,
-					created_at INTEGER,
-					pubkey TEXT(64),
-					sig TEXT(128),
-					kind INTEGER,
-					content TEXT,
-					tags TEXT
-				)
-				`,
-				)
-				.run();
-
-			// Create tags table
-			this.db
-				.prepare(
-					`
-				CREATE TABLE IF NOT EXISTS tags (
-					i INTEGER PRIMARY KEY AUTOINCREMENT,
-					e TEXT(64) REFERENCES events(id),
-					t TEXT(1),
-					v TEXT
-				)
-				`,
-				)
-				.run();
-
-			// Create indices
-			const indices = [
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_created_at ON events(created_at)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_pubkey ON events(pubkey)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS events_kind ON events(kind)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_e ON tags(e)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_t ON tags(t)'),
-				this.db.prepare('CREATE INDEX IF NOT EXISTS tags_v ON tags(v)'),
-			];
-
-			indices.forEach((statement) => statement.run());
-		})();
-
-		this.log('Setup tables and indices');
+	setup() {
+		return migrations.run(this.db);
 	}
 
-	addEvent(
-		event: NostrEvent,
-		options: {
-			preserveEphemeral?: boolean;
-			preserveReplaceable?: boolean;
-		} = {},
-	) {
+	addEvent(event: NostrEvent) {
 		// Don't store ephemeral events in db,
 		// just return the event directly
-		if (!options.preserveEphemeral && kinds.isEphemeralKind(event.kind)) return false;
+		if (!this.preserveEphemeral && kinds.isEphemeralKind(event.kind)) return false;
 
 		const inserted = this.db.transaction(() => {
 			// TODO: Check if event is replaceable and if its newer
@@ -105,44 +191,37 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 					JSON.stringify(event.tags),
 				]);
 
-			// If event inserted, index tags
+			// If event inserted, index tags, insert search
 			if (insert.changes) {
-				for (let tag of event.tags) {
-					// add single tags into tags table
-					if (tag[0].length === 1) {
-						this.db.prepare(`INSERT INTO tags (e, t, v) VALUES (?, ?, ?)`).run(event.id, tag[0], tag[1]);
-					}
-				}
+				this.insertEventTags(event);
 
-				// By default, remove older replaceable
-				// events and all their associated tags
-				if (!options.preserveReplaceable) {
-					let existing: { id: string; created_at: number }[] = [];
+				// Remove older replaceable events and all their associated tags
+				if (this.preserveReplaceable === false) {
+					let older: { id: string; created_at: number }[] = [];
 
 					if (kinds.isReplaceableKind(event.kind)) {
 						// Normal replaceable event
-						existing = this.db
-							.prepare(
+						older = this.db
+							.prepare<[number, string], { id: string; created_at: number }>(
 								`
-								SELECT events.id, events.created_at FROM events
-								WHERE kind = ? AND pubkey = ?
-							`,
+								SELECT id, created_at FROM events WHERE kind = ? AND pubkey = ?
+								`,
 							)
-							.all(event.kind, event.pubkey) as { id: string; created_at: number }[];
+							.all(event.kind, event.pubkey);
 					} else if (kinds.isParameterizedReplaceableKind(event.kind)) {
 						// Parameterized Replaceable
 						const d = event.tags.find((t) => t[0] === 'd')?.[1];
 
 						if (d) {
-							existing = this.db
-								.prepare(
+							older = this.db
+								.prepare<[number, string, 'd', string], { id: string; created_at: number }>(
 									`
 									SELECT events.id, events.created_at FROM events
 									INNER JOIN tags ON events.id = tags.e
 									WHERE kind = ? AND pubkey = ? AND tags.t = ? AND tags.v = ?
 								`,
 								)
-								.all(event.kind, event.pubkey, 'd', d) as { id: string; created_at: number }[];
+								.all(event.kind, event.pubkey, 'd', d);
 						}
 					}
 
@@ -150,8 +229,8 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 					// sort the events according to timestamp descending,
 					// falling back to id lexical order ascending as per
 					// NIP-01. Remove all non-most-recent events and tags.
-					if (existing.length > 1) {
-						const removeIds = existing
+					if (older.length > 1) {
+						const removeIds = older
 							.sort((a, b) => {
 								return a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at - a.created_at;
 							})
@@ -175,14 +254,34 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			return insert.changes > 0;
 		})();
 
-		if (inserted) this.emit('event:inserted', event);
+		if (inserted) {
+			this.insertEventIntoSearch(event);
+			this.emit('event:inserted', event);
+		}
 
 		return inserted;
+	}
+
+	private insertEventTags(event: NostrEvent) {
+		for (let tag of event.tags) {
+			if (tag[0].length === 1) {
+				this.db.prepare(`INSERT INTO tags (e, t, v) VALUES (?, ?, ?)`).run(event.id, tag[0], tag[1]);
+			}
+		}
+	}
+
+	private insertEventIntoSearch(event: NostrEvent) {
+		const search = convertEventToSearchRow(event);
+
+		return this.db
+			.prepare<[string, string, string]>(`INSERT OR REPLACE INTO events_fts (id, content, tags) VALUES (?, ?, ?)`)
+			.run(search.id, search.content, search.tags);
 	}
 
 	removeEvents(ids: string[]) {
 		const results = this.db.transaction(() => {
 			this.db.prepare(`DELETE FROM tags WHERE e IN ${mapParams(ids)}`).run(...ids);
+			this.db.prepare(`DELETE FROM events_fts WHERE id IN ${mapParams(ids)}`).run(...ids);
 
 			return this.db.prepare(`DELETE FROM events WHERE events.id IN ${mapParams(ids)}`).run(...ids);
 		})();
@@ -197,6 +296,7 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 	removeEvent(id: string) {
 		const results = this.db.transaction(() => {
 			this.db.prepare(`DELETE FROM tags WHERE e = ?`).run(id);
+			this.db.prepare(`DELETE FROM events_fts WHERE id = ?`).run(id);
 
 			return this.db.prepare(`DELETE FROM events WHERE events.id = ?`).run(id);
 		})();
@@ -217,6 +317,12 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 
 		if (tagQueries.length > 0) {
 			joins.push('INNER JOIN tags ON events.id = tags.e');
+		}
+		if (filter.search) {
+			joins.push('INNER JOIN events_fts ON events_fts.id = events.id');
+
+			conditions.push(`events_fts MATCH ?`);
+			parameters.push('"' + filter.search.replace(/"/g, '""') + '"');
 		}
 
 		if (typeof filter.since === 'number') {
@@ -281,7 +387,13 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			sql += ` WHERE ${orConditions.join(' OR ')}`;
 		}
 
-		sql = sql + ' ORDER BY created_at DESC';
+		// @ts-expect-error
+		const order = filters.find((f) => f.order)?.order;
+		if (filters.some((f) => f.search) && (order === 'rank' || order === undefined)) {
+			sql = sql + ' ORDER BY rank';
+		} else {
+			sql = sql + ' ORDER BY created_at DESC';
+		}
 
 		let minLimit = Infinity;
 		for (const filter of filters) {
@@ -296,25 +408,21 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 	}
 
 	getEventsForFilters(filters: Filter[]) {
-		type Row = {
-			id: string;
-			kind: number;
-			pubkey: string;
-			content: string;
-			tags: string;
-			created_at: number;
-			sig: string;
-		};
-
 		const { sql, parameters } = this.buildSQLQueryForFilters(filters);
 
-		const results = this.db.prepare(sql).all(parameters) as Row[];
+		return this.db.prepare<any[], EventRow>(sql).all(parameters).map(parseEventRow);
+	}
 
-		function parseEventTags(row: Row): NostrEvent {
-			return { ...row, tags: JSON.parse(row.tags) };
+	*iterateEventsForFilters(filters: Filter[]): IterableIterator<NostrEvent> {
+		const { sql, parameters } = this.buildSQLQueryForFilters(filters);
+		const iterator = this.db.prepare<any[], EventRow>(sql).iterate(parameters);
+
+		while (true) {
+			const { value: row, done } = iterator.next();
+			if (done) break;
+
+			yield parseEventRow(row);
 		}
-
-		return results.map(parseEventTags);
 	}
 
 	countEventsForFilters(filters: Filter[]) {

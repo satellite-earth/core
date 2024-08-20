@@ -3,19 +3,13 @@ import { Adapter, Low, LowSync, SyncAdapter } from 'lowdb';
 
 import { PrivateNodeConfig } from '@satellite-earth/core/types/private-node-config.js';
 
-export const defaultConfig: PrivateNodeConfig = {
-	//pubkeys: [],
-	//relays: [],
-	//cacheLevel: 2,
-	autoListen: false,
-	logsEnabled: true,
-	requireReadAuth: false,
-	publicAddresses: [],
-};
-
 type EventMap<T> = {
+	/** fires when file is loaded */
 	loaded: [T];
+	/** fires when a field is set */
 	changed: [T, string, any];
+	/** fires when file is loaded or changed */
+	updated: [T];
 	saved: [T];
 };
 
@@ -42,6 +36,7 @@ export class ReactiveJsonFile<T extends object> extends EventEmitter<EventMap<T>
 			set: (target, p, newValue, receiver) => {
 				Reflect.set(target, p, newValue, receiver);
 				this.emit('changed', target as T, String(p), newValue);
+				this.emit('updated', target as T);
 				return newValue;
 			},
 		}));
@@ -50,6 +45,7 @@ export class ReactiveJsonFile<T extends object> extends EventEmitter<EventMap<T>
 	async read() {
 		await this.db.read();
 		this.emit('loaded', this.data);
+		this.emit('updated', this.data);
 		this.createProxy();
 	}
 	async write() {
@@ -84,6 +80,7 @@ export class ReactiveJsonFileSync<T extends object> extends EventEmitter<EventMa
 			set: (target, p, newValue, receiver) => {
 				Reflect.set(target, p, newValue, receiver);
 				this.emit('changed', target as T, String(p), newValue);
+				this.emit('updated', target as T);
 				return newValue;
 			},
 		}));
@@ -92,6 +89,7 @@ export class ReactiveJsonFileSync<T extends object> extends EventEmitter<EventMa
 	read() {
 		this.db.read();
 		this.emit('loaded', this.data);
+		this.emit('updated', this.data);
 		this.createProxy();
 	}
 	write() {

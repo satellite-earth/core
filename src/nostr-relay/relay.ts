@@ -170,7 +170,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 	sendEventToSubscriptions(event: NostrEvent) {
 		for (const sub of this.subscriptions) {
-			if (sub.type === 'REQ' && matchFilters(sub.filters, event)) {
+			if (sub.type === 'REQ' && !sub.filters.some((f) => f.search) && matchFilters(sub.filters, event)) {
 				sub.ws.send(JSON.stringify(['EVENT', sub.id, event]));
 			}
 		}

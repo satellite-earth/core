@@ -17,6 +17,18 @@
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
 		},
+		"./sqlite": {
+			"import": "./dist/sqlite/index.js",
+			"types": "./dist/sqlite/index.d.ts"
+		},
+		"./sqlite-event-store": {
+			"import": "./dist/sqlite-event-store/index.js",
+			"types": "./dist/sqlite-event-store/index.d.ts"
+		},
+		"./helpers/*": {
+			"import": "./dist/helpers/*",
+			"types": "./dist/helpers/*"
+		},
 		"./helpers/nostr": {
 			"import": "./dist/helpers/nostr/index.js",
 			"types": "./dist/helpers/nostr/index.d.ts"
@@ -34,6 +46,7 @@
 			"types": "./dist/types/control-api/*"
 		}
 	},
+	"packageManager": "pnpm@9.6.0",
 	"scripts": {
 		"prepack": "pnpm build",
 		"dev": "node dist/test.js",
@@ -43,11 +56,11 @@
 		"format": "prettier -w ."
 	},
 	"dependencies": {
-		"better-sqlite3": "^9.6.0",
-		"blossom-client-sdk": "^0.5.1",
-		"blossom-server-sdk": "^0.3.1",
+		"better-sqlite3": "^11.1.2",
+		"blossom-client-sdk": "^0.9.0",
+		"blossom-server-sdk": "^0.4.0",
 		"cors": "^2.8.5",
-		"debug": "^4.3.4",
+		"debug": "^4.3.6",
 		"express": "^4.19.2",
 		"express-async-handler": "^1.2.0",
 		"follow-redirects": "^1.15.6",
@@ -59,7 +72,7 @@
 		"ws": "^8.16.0"
 	},
 	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.9",
+		"@types/better-sqlite3": "^7.6.11",
 		"@types/debug": "^4.1.12",
 		"@types/express": "^4.17.21",
 		"@types/follow-redirects": "^1.14.4",
