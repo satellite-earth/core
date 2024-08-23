@@ -68,7 +68,7 @@
 		"http-errors": "^2.0.0",
 		"lowdb": "^7.0.1",
 		"mime": "^4.0.1",
-		"nostr-tools": "^2.5.2",
+		"nostr-tools": "^2.7.2",
 		"ws": "^8.16.0"
 	},
 	"devDependencies": {
