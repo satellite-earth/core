@@ -47,6 +47,8 @@ type EventMap = {
 };
 
 export class NostrRelay extends EventEmitter<EventMap> {
+	static SUPPORTED_NIPS = [1, 4, 11, 45, 50, 70];
+
 	log = logger.extend('relay');
 	eventStore: IEventStore;
 
@@ -208,6 +210,12 @@ export class NostrRelay extends EventEmitter<EventMap> {
 
 			// Verify the event's signature
 			if (!verifyEvent(event)) throw new Error(`invalid: event failed to validate or verify`);
+
+			// NIP-70 protected events
+			const isProtected = event.tags.some((t) => t[0] === '-');
+			if (isProtected && this.auth.get(ws)?.response?.pubkey !== event.pubkey) {
+				throw new Error('auth-required: this event may only be published by its author');
+			}
 
 			const context: HandlerContext = { event, socket: ws, relay: this };
 			let persist = (await this.callEventHandler(context)) ?? true;
