@@ -47,7 +47,7 @@ type EventMap = {
 };
 
 export class NostrRelay extends EventEmitter<EventMap> {
-	static SUPPORTED_NIPS = [1, 4, 11, 45, 50, 70];
+	static SUPPORTED_NIPS = [1, 4, 11, 45, 50, 70, 119];
 
 	log = logger.extend('relay');
 	eventStore: IEventStore;

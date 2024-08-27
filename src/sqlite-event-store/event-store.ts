@@ -10,6 +10,9 @@ import { MigrationSet } from '../sqlite/migrations.js';
 const isFilterKeyIndexableTag = (key: string) => {
 	return key[0] === '#' && key.length === 2;
 };
+const isFilterKeyIndexableAndTag = (key: string) => {
+	return key[0] === '&' && key.length === 2;
+};
 
 export type EventRow = {
 	id: string;
@@ -310,13 +313,21 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 		const joins: string[] = [];
 		const conditions: string[] = [];
 		const parameters: (string | number)[] = [];
+		const groupBy: string[] = [];
+		const having: string[] = [];
 
-		const tagQueries = Object.keys(filter).filter((t) => {
-			return isFilterKeyIndexableTag(t);
-		});
+		// get AND tag filters
+		const andTagQueries = Object.keys(filter).filter(isFilterKeyIndexableAndTag);
+		// get OR tag filters and remove any ones that appear in the AND
+		const orTagQueries = Object.keys(filter)
+			.filter(isFilterKeyIndexableTag)
+			.filter((t) => !andTagQueries.includes(t));
 
-		if (tagQueries.length > 0) {
-			joins.push('INNER JOIN tags ON events.id = tags.e');
+		if (orTagQueries.length > 0) {
+			joins.push('INNER JOIN tags as or_tags ON events.id = or_tags.e');
+		}
+		if (andTagQueries.length > 0) {
+			joins.push('INNER JOIN tags as and_tags ON events.id = and_tags.e');
 		}
 		if (filter.search) {
 			joins.push('INNER JOIN events_fts ON events_fts.id = events.id');
@@ -350,24 +361,47 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 			parameters.push(...filter.authors);
 		}
 
-		for (let t of tagQueries) {
-			conditions.push(`tags.t = ?`);
+		// add AND tag filters
+		for (const t of andTagQueries) {
+			conditions.push(`and_tags.t = ?`);
 			parameters.push(t.slice(1));
 
 			// @ts-expect-error
 			const v = filter[t] as string[];
-			conditions.push(`tags.v IN ${mapParams(v)}`);
+			conditions.push(`and_tags.v IN ${mapParams(v)}`);
 			parameters.push(...v);
 		}
 
-		return { conditions, parameters, joins };
+		// add OR tag filters
+		for (let t of orTagQueries) {
+			conditions.push(`or_tags.t = ?`);
+			parameters.push(t.slice(1));
+
+			// @ts-expect-error
+			const v = filter[t] as string[];
+			conditions.push(`or_tags.v IN ${mapParams(v)}`);
+			parameters.push(...v);
+		}
+
+		// if there is an AND tag filter set GROUP BY so that HAVING can be used
+		if (andTagQueries.length > 0) {
+			groupBy.push('events.id');
+			having.push('COUNT(and_tags.i) = ?');
+
+			// @ts-expect-error
+			parameters.push(andTagQueries.reduce((t, k) => t + (filter[k] as string[]).length, 0));
+		}
+
+		return { conditions, parameters, joins, groupBy, having };
 	}
 
-	protected buildSQLQueryForFilters(filters: Filter[]) {
-		let sql = 'SELECT events.* FROM events ';
+	protected buildSQLQueryForFilters(filters: Filter[], select = 'events.*') {
+		let sql = `SELECT ${select} FROM events `;
 
 		const orConditions: string[] = [];
 		const parameters: any[] = [];
+		const groupBy = new Set<string>();
+		const having = new Set<string>();
 
 		let joins = new Set<string>();
 		for (const filter of filters) {
@@ -378,6 +412,8 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 				parameters.push(...parts.parameters);
 
 				for (const join of parts.joins) joins.add(join);
+				for (const group of parts.groupBy) groupBy.add(group);
+				for (const have of parts.having) having.add(have);
 			}
 		}
 
@@ -385,6 +421,13 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 
 		if (orConditions.length > 0) {
 			sql += ` WHERE ${orConditions.join(' OR ')}`;
+		}
+
+		if (groupBy.size > 0) {
+			sql += ' GROUP BY ' + Array.from(groupBy).join(',');
+		}
+		if (having.size > 0) {
+			sql += ' HAVING ' + Array.from(having).join(' AND ');
 		}
 
 		// @ts-expect-error
@@ -426,28 +469,11 @@ export class SQLiteEventStore extends EventEmitter<EventMap> implements IEventSt
 	}
 
 	countEventsForFilters(filters: Filter[]) {
-		let sql = 'SELECT count(events.id) as count FROM events ';
+		const { sql, parameters } = this.buildSQLQueryForFilters(filters);
 
-		const orConditions: string[] = [];
-		const parameters: any[] = [];
-
-		let joins = new Set<string>();
-		for (const filter of filters) {
-			const parts = this.buildConditionsForFilters(filter);
-
-			orConditions.push(`(${parts.conditions.join(' AND ')})`);
-			parameters.push(...parts.parameters);
-
-			for (const join of parts.joins) joins.add(join);
-		}
-
-		sql += Array.from(joins).join(' ');
-
-		if (orConditions.length > 0) {
-			sql += ` WHERE ${orConditions.join(' OR ')}`;
-		}
-
-		const results = this.db.prepare(sql).get(parameters) as { count: number };
-		return results.count;
+		const results = this.db.prepare(`SELECT COUNT(*) as count FROM ( ${sql} )`).get(parameters) as
+			| { count: number }
+			| undefined;
+		return results?.count ?? 0;
 	}
 }
