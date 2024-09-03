@@ -1,5 +1,8 @@
 export type PrivateNodeConfig = {
 	owner?: string;
+	name: string;
+	description: string;
+
 	/**
 	 * Whether the node should require NIP-42 auth to read
 	 * Desktop: false by default
@@ -22,7 +25,9 @@ export type PrivateNodeConfig = {
 	runScrapperOnBoot: boolean;
 	runReceiverOnBoot: boolean;
 
+	// hyper
+	hyperEnabled: boolean;
+
 	// VAPID keys
 	vapidPublicKey?: string;
-	vapidPrivateKey?: string;
 };

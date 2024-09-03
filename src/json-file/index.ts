@@ -1,8 +1,6 @@
 import { EventEmitter } from 'events';
 import { Adapter, Low, LowSync, SyncAdapter } from 'lowdb';
 
-import { PrivateNodeConfig } from '@satellite-earth/core/types/private-node-config.js';
-
 type EventMap<T> = {
 	/** fires when file is loaded */
 	loaded: [T];
@@ -14,7 +12,7 @@ type EventMap<T> = {
 };
 
 export class ReactiveJsonFile<T extends object> extends EventEmitter<EventMap<T>> implements Low<T> {
-	private db: Low<T>;
+	protected db: Low<T>;
 	adapter: Adapter<T>;
 
 	data: T;
@@ -37,7 +35,7 @@ export class ReactiveJsonFile<T extends object> extends EventEmitter<EventMap<T>
 				Reflect.set(target, p, newValue, receiver);
 				this.emit('changed', target as T, String(p), newValue);
 				this.emit('updated', target as T);
-				return newValue;
+				return true;
 			},
 		}));
 	}
@@ -58,7 +56,7 @@ export class ReactiveJsonFile<T extends object> extends EventEmitter<EventMap<T>
 }
 
 export class ReactiveJsonFileSync<T extends object> extends EventEmitter<EventMap<T>> implements LowSync<T> {
-	private db: LowSync<T>;
+	protected db: LowSync<T>;
 	adapter: SyncAdapter<T>;
 
 	data: T;
@@ -81,7 +79,7 @@ export class ReactiveJsonFileSync<T extends object> extends EventEmitter<EventMa
 				Reflect.set(target, p, newValue, receiver);
 				this.emit('changed', target as T, String(p), newValue);
 				this.emit('updated', target as T);
-				return newValue;
+				return true;
 			},
 		}));
 	}
