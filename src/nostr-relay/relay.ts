@@ -233,7 +233,7 @@ export class NostrRelay extends EventEmitter<EventMap> {
 				this.emit('event:received', event, ws);
 				if (inserted) {
 					this.emit('event:inserted', event, ws);
-					this.sendPublishOkMessage(ws, event, true, typeof persist === 'string' ? persist : 'Accepted');
+					this.sendPublishOkMessage(ws, event, true, typeof persist === 'string' ? persist : '');
 
 					this.sendEventToSubscriptions(event);
 				} else {
