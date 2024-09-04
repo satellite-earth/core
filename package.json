@@ -49,7 +49,6 @@
 	"packageManager": "pnpm@9.6.0",
 	"scripts": {
 		"prepack": "pnpm build",
-		"dev": "node dist/test.js",
 		"test": "echo no tests",
 		"build": "tsc",
 		"reset": "rm -rf data/*",
