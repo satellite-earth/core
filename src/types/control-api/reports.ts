@@ -1,5 +1,8 @@
 import { NostrEvent } from 'nostr-tools';
 
+type NetworkOutboundInterface = { available: boolean; running?: boolean; error?: string };
+type NetworkInboundInterface = { available: boolean; running?: boolean; error?: string; address?: string };
+
 export type ReportArguments = {
 	OVERVIEW: {};
 	CONVERSATIONS: { pubkey: string };
@@ -8,6 +11,7 @@ export type ReportArguments = {
 	DM_SEARCH: { query: string; conversation?: [string, string]; order?: 'rank' | 'created_at' };
 	SCRAPPER_STATUS: {};
 	RECEIVER_STATUS: {};
+	NETWORK_STATUS: {};
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number; active: number };
@@ -27,6 +31,11 @@ export type ReportResults = {
 		status: 'starting' | 'running' | 'stopped' | 'errored';
 		startError?: string;
 		subscriptions: { relay: string; pubkeys: string[]; closed: boolean }[];
+	};
+	NETWORK_STATUS: {
+		tor: { outbound: NetworkOutboundInterface; inbound: NetworkInboundInterface };
+		hyper: { outbound: NetworkOutboundInterface; inbound: NetworkInboundInterface };
+		i2p: { outbound: NetworkOutboundInterface; inbound: NetworkInboundInterface };
 	};
 };
 

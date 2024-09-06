@@ -28,6 +28,13 @@ export type PrivateNodeConfig = {
 	// hyper
 	hyperEnabled: boolean;
 
+	/** whether to allow connection to .hyper relays if available */
+	enableHyperConnections: boolean;
+	/** whether to allow connection to .onion relays if available */
+	enableTorConnections: boolean;
+	/** whether to allow connection to .i2p relays if available */
+	enableI2PConnections: boolean;
+
 	// VAPID keys
 	vapidPublicKey?: string;
 };
