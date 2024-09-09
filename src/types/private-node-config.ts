@@ -35,6 +35,9 @@ export type PrivateNodeConfig = {
 	/** whether to allow connection to .i2p relays if available */
 	enableI2PConnections: boolean;
 
+	/** makes all websocket and http traffic use the tor proxy */
+	routeAllTrafficThroughTor: boolean;
+
 	// VAPID keys
 	vapidPublicKey?: string;
 };
