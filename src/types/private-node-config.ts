@@ -40,4 +40,7 @@ export type PrivateNodeConfig = {
 
 	// VAPID keys
 	vapidPublicKey?: string;
+
+	// fallback notification email, this is only used for ntfy notifications
+	notificationEmail?: string;
 };

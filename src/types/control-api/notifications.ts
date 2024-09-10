@@ -1,38 +1,54 @@
 import { NostrEvent } from 'nostr-tools';
 
-export type WebSubscription = {
+type DeviceType = 'mobile' | 'desktop';
+
+type BaseSubscription = {
+	id: string;
+	type: string;
+	deviceType: DeviceType;
+};
+export type WebSubscription = BaseSubscription & {
 	type: 'web';
-	deviceType: 'mobile' | 'desktop';
 	endpoint: string;
 	expirationTime: PushSubscriptionJSON['expirationTime'];
 	keys: {
 		p256dh: string;
 		auth: string;
-	}; //PushSubscriptionJSON['keys'];
+	};
+};
+export type NtfySubscription = BaseSubscription & {
+	type: 'ntfy';
+	server: string;
+	topic: string;
 };
 
-type NotificationsRegister = ['CONTROL', 'NOTIFICATIONS', 'REGISTER', WebSubscription];
+export type NotificationSubscription = WebSubscription | NtfySubscription;
+
+type NotificationsRegister = ['CONTROL', 'NOTIFICATIONS', 'REGISTER', NotificationSubscription];
 type NotificationsUnregister = ['CONTROL', 'NOTIFICATIONS', 'UNREGISTER', string];
+type NotificationsNotify = ['CONTROL', 'NOTIFICATIONS', 'NOTIFY', string];
 type NotificationsList = ['CONTROL', 'NOTIFICATIONS', 'LIST'];
 type NotificationsGetVapidKey = ['CONTROL', 'NOTIFICATIONS', 'GET-VAPID-KEY'];
 
-type NotificationsListResponse = ['CONTROL', 'NOTIFICATIONS', 'LIST', WebSubscription[]];
+type NotificationsListResponse = ['CONTROL', 'NOTIFICATIONS', 'LIST', NotificationSubscription[]];
 type NotificationsVapidKey = ['CONTROL', 'NOTIFICATIONS', 'VAPID-KEY', string];
 
 export type NotificationsMessage =
 	| NotificationsRegister
 	| NotificationsUnregister
 	| NotificationsList
+	| NotificationsNotify
 	| NotificationsGetVapidKey;
 export type NotificationsResponse = NotificationsListResponse | NotificationsVapidKey;
 
 // notification types
 
-export type DirectMessageNotification = {
-	/** senders kind:0 event */
-	sender?: NostrEvent;
-	/** DM event */
+export type WebPushNotification = {
+	title: string;
+	body: string;
+	icon: string;
+	url: string;
 	event: NostrEvent;
 };
 
-export type NotificationType = DirectMessageNotification;
+export type NotificationType = WebPushNotification;
