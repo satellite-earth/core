@@ -1,4 +1,5 @@
 import { NostrEvent } from 'nostr-tools';
+import { NotificationChannel } from './notifications.js';
 
 type NetworkOutboundInterface = { available: boolean; running?: boolean; error?: string };
 type NetworkInboundInterface = { available: boolean; running?: boolean; error?: string; address?: string };
@@ -12,6 +13,7 @@ export type ReportArguments = {
 	SCRAPPER_STATUS: {};
 	RECEIVER_STATUS: {};
 	NETWORK_STATUS: {};
+	NOTIFICATION_CHANNELS: {};
 };
 export type ReportResults = {
 	OVERVIEW: { pubkey: string; events: number; active: number };
@@ -37,6 +39,7 @@ export type ReportResults = {
 		hyper: { outbound: NetworkOutboundInterface; inbound: NetworkInboundInterface };
 		i2p: { outbound: NetworkOutboundInterface; inbound: NetworkInboundInterface };
 	};
+	NOTIFICATION_CHANNELS: NotificationChannel | ['removed', string];
 };
 
 // client -> server

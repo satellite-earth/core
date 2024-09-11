@@ -2,12 +2,12 @@ import { NostrEvent } from 'nostr-tools';
 
 type DeviceType = 'mobile' | 'desktop';
 
-type BaseSubscription = {
+type BaseChannel = {
 	id: string;
 	type: string;
-	deviceType: DeviceType;
+	device?: string;
 };
-export type WebSubscription = BaseSubscription & {
+export type WebPushChannel = BaseChannel & {
 	type: 'web';
 	endpoint: string;
 	expirationTime: PushSubscriptionJSON['expirationTime'];
@@ -16,33 +16,29 @@ export type WebSubscription = BaseSubscription & {
 		auth: string;
 	};
 };
-export type NtfySubscription = BaseSubscription & {
+export type NtfyChannel = BaseChannel & {
 	type: 'ntfy';
 	server: string;
 	topic: string;
 };
 
-export type NotificationSubscription = WebSubscription | NtfySubscription;
+export type NotificationChannel = WebPushChannel | NtfyChannel;
 
-type NotificationsRegister = ['CONTROL', 'NOTIFICATIONS', 'REGISTER', NotificationSubscription];
+type NotificationsRegister = ['CONTROL', 'NOTIFICATIONS', 'REGISTER', NotificationChannel];
 type NotificationsUnregister = ['CONTROL', 'NOTIFICATIONS', 'UNREGISTER', string];
 type NotificationsNotify = ['CONTROL', 'NOTIFICATIONS', 'NOTIFY', string];
-type NotificationsList = ['CONTROL', 'NOTIFICATIONS', 'LIST'];
 type NotificationsGetVapidKey = ['CONTROL', 'NOTIFICATIONS', 'GET-VAPID-KEY'];
 
-type NotificationsListResponse = ['CONTROL', 'NOTIFICATIONS', 'LIST', NotificationSubscription[]];
 type NotificationsVapidKey = ['CONTROL', 'NOTIFICATIONS', 'VAPID-KEY', string];
 
 export type NotificationsMessage =
 	| NotificationsRegister
 	| NotificationsUnregister
-	| NotificationsList
 	| NotificationsNotify
 	| NotificationsGetVapidKey;
-export type NotificationsResponse = NotificationsListResponse | NotificationsVapidKey;
+export type NotificationsResponse = NotificationsVapidKey;
 
-// notification types
-
+// push notification types
 export type WebPushNotification = {
 	title: string;
 	body: string;
