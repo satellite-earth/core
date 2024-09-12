@@ -9,7 +9,7 @@ on:
       - 'v*.*.*'
 
 jobs:
-  publish-gpr:
+  publish-package:
     runs-on: ubuntu-latest
     permissions:
       contents: read
